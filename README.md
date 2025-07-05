@@ -1,6 +1,6 @@
 # Overview
 
-DB is a database query builder for [F4](https://github.com/f4php/f4), a lightweigh web development framework.
+DB is a database query builder for [F4](https://github.com/f4php/f4), a lightweight web development framework.
 
 ## Configuration
 
