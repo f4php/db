@@ -45,17 +45,17 @@ DB supports three types of placeholders, as explained below:
 
 When query is built, you may want to use the following tail methods to fetch results:
 
-`$db->asTable()` — fetch all rows
+`$db->asTable()` to fetch all rows
 
-`$db->asRow()` — fetch one row
+`$db->asRow()` to fetch one row
 
-`$db->asValue()` — fetch scalar value
+`$db->asValue()` to fetch scalar value
 
-`$db->asSQL()` - returns raw SQL statement without bound parameters
+`$db->asSQL()` to get raw SQL statement without bound parameters
 
-`$db->getPreparedStatement()->query` - same as `asSQL()`
+`$db->getPreparedStatement()->query` same as `asSQL()`
 
-`$db->getPreparedStatement()->parameters` - returns an array of statement-bound parameters
+`$db->getPreparedStatement()->parameters` returns an array of statement-bound parameters
 
 ## Usage Examples
 
