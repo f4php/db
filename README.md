@@ -31,7 +31,7 @@ DB tries to recreate SQL syntax in PHP-native expressions as much as possible.
 
 DB is focused around PostgreSQL syntax and hasn't been tested with other DBMS's, although an `Adapter` approach allows a developer to use other database engines.
 
-Currently, DB supports a large but still limited subset of SQL syntax, which grows slowly as new features are added.
+Currently, DB supports a substantial but still limited subset of SQL syntax, which grows slowly as new features are added.
 
 Currently supported keywords are:
 
@@ -98,7 +98,7 @@ It is the developer's responsibility to follow SQL grammar when daisy-chaining D
 
 ## Placeholders
 
-DB uses a concept of placeholders, which follow custom (non-standard) syntax conventions to allow a developer place variable values in a query as (potentially) complex parameters.
+DB utilizes a concept of placeholders, which follow custom (non-standard) syntax convention to allow a developer to place/substitute variable values in a query as subqueries or (potentially) complex bound parameters.
 
 Three types of placeholders are supported:
 
