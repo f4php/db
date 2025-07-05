@@ -20,7 +20,7 @@ class Config {
     public const string DB_PASSWORD = '';
     public const string DB_SCHEMA = '';
     public const ?string DB_APP_NAME = null;
-    public const string DB_ADAPTER_CLASS = PostgresqlAdapter::class;
+    public const string DB_ADAPTER_CLASS = \F4\DB\Adapter\PostgresqlAdapter::class;
     public const bool DB_PERSIST = true;
 }
 ```
