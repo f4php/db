@@ -1,6 +1,6 @@
 {
     "name": "f4php/db",
-    "description": "DB is a database query builder for F4, a (really) lightweight web application framework",
+    "description": "DB is a database query builder, core package for F4, a lightweight web development framework",
     "keywords": ["f4","framework","database","query builder"],
     "license": "MIT",
     "autoload": {
