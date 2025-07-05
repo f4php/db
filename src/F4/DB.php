@@ -45,12 +45,10 @@ use function is_int;
 class DB extends FragmentCollection implements FragmentCollectionInterface, FragmentInterface
 {
     protected AdapterInterface $adapter;
-
     public function __construct(?string $connectionString = null, string $adapterClass = Config::DB_ADAPTER_CLASS)
     {
         $this->adapter = new $adapterClass($connectionString);
     }
-
     public function __call(string $method, array $arguments): static
     {
         match ($method) {

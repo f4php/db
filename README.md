@@ -31,9 +31,76 @@ DB tries to recreate SQL syntax in PHP-native expressions as much as possible.
 
 DB is focused around PostgreSQL syntax and hasn't been tested with other DBMS's, although an `Adapter` approach allows a developer to use other database engines.
 
-DB uses a concept of placeholders, which follow custom (non-standard) syntax to substitute variable values in a query as bound statement parameters.
+Currently, DB supports a large but still limited subset of SQL syntax, which grows slowly as new features are added.
 
-DB supports three types of placeholders, as explained below:
+Currently supported keywords are:
+
+`delete()`,
+`doNothing()`,
+`doUpdateSet()`,
+`dropTable()`,
+`dropTableIfExists()`,
+`dropTableWithCascade()`,
+`dropTableIfExistsWithCascade()`,
+`except()`,
+`exceptAll()`,
+`from()`,
+`fullOuterJoin()`,
+`group()`, `groupBy()`,
+`groupByAll()`,
+`groupByDistinct()`,
+`having()`,
+`insert()`,
+`intersect()`,
+`intersectAll()`,
+`into()`,
+`join()`,
+`leftJoin()`,
+`leftJoinLateral()`,
+`leftOuterJoin()`,
+`limit()`,
+`offset()`,
+`on()`,
+`onConflict()`,
+`order()`, `orderBy()`,
+`raw()`,
+`returning()`,
+`rightJoin()`,
+`rightOuterJoin()`,
+`select()`,
+`selectDistinct()`,
+`set()`,
+`update()`,
+`union()`,
+`unionAll()`,
+`using()`,
+`values()`,
+`where()`,
+`with()`,
+`withRecursive()`
+
+Additionally, the following methods support static invokation:
+
+`DB::raw()`,
+`DB::delete()`,
+`DB::dropTable()`,
+`DB::dropTableIfExists()`,
+`DB::dropTableWithCascade()`,
+`DB::dropTableIfExistsWithCascade()`,
+`DB::insert()`,
+`DB::select()`,
+`DB::selectDistinct()`,
+`DB::update()`,
+`DB::with()`,
+`DB::withRecursive()`
+
+It is the developer's responsibility to follow SQL grammar when daisy-chaining DB method calls.
+
+## Placeholders
+
+DB uses a concept of placeholders, which follow custom (non-standard) syntax conventions to allow a developer place variable values in a query as (potentially) complex parameters.
+
+Three types of placeholders are supported:
 
 `{#}` for a scalar value
 
@@ -41,11 +108,15 @@ DB supports three types of placeholders, as explained below:
 
 `{#::#}` for a DB object instance
 
+Please see the Usage Examples section below for more details.
+
 ## Getting Results
 
 When query is built, you may want to use the following tail methods to fetch results:
 
 `$db->asTable()` to fetch all rows
+
+`$db->commit()` same as `asTable()`
 
 `$db->asRow()` to fetch one row
 
