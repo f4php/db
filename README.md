@@ -62,6 +62,8 @@ When query is built, you may want to use the following tail methods to fetch res
 ### Simple Query
 
 ```php
+use F4\DB;
+
 $rows = DB::select()
     ->from('table1 t1')
     ->rightJoin("table2 t2")
@@ -80,6 +82,7 @@ and fetch all available rows as a multi-dimensional php array.
 ### Slightly More Complex Query
 
 ```php
+use F4\DB;
 use F4\DB\AnyConditionCollection as any;
 
 // ...
