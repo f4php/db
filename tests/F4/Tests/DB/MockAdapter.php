@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace F4\Tests\DB;
 
 use Composer\Pcre\Preg;
+use DateTime;
 use F4\DB\Adapter\AdapterInterface;
 use F4\DB\PreparedStatement;
 use InvalidArgumentException;
 
-use function array_map;
-use function implode;
-use function is_array;
 use function is_bool;
 use function is_float;
 use function is_int;

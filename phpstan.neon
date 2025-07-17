@@ -1,8 +1,15 @@
 parameters:
-    bootstrapFiles:
-        - tests/F4/Config.php
+  bootstrapFiles:
+    - tests/F4/Config.php
+  ignoreErrors:
+    -
+      message: '#Property F4\\DB\\Adapter\\PostgresqlAdapter::\$connection in isset\(\) is not nullable nor uninitialized#'
+      path: src/F4/DB/Adapter/PostgresqlAdapter.php
+    -
+      message: '#Variable \$existingValuesFragmentCollection might not be defined#'
+      path: src/F4/DB.php
 services:
-	-
-		class: F4\PHPStan\Reflection\DB\DBClassReflectionExtension
-		tags:
-			- phpstan.broker.methodsClassReflectionExtension
+  -
+    class: F4\PHPStan\Reflection\DB\DBClassReflectionExtension
+    tags:
+      - phpstan.broker.methodsClassReflectionExtension

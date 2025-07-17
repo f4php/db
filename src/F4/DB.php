@@ -266,7 +266,7 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
     public function asSQL(): string
     {
         $parameters = $this->getPreparedStatement()->parameters;
-        $escapedParametersEnumerator = function (mixed $index) use (&$escapedParametersEnumerator, $parameters): mixed {
+        $escapedParametersEnumerator = function (mixed $index) use ($parameters): mixed {
             if (!array_key_exists($index - 1, $parameters)) {
                 throw new InvalidArgumentException('Unexpected parameter index');
             }

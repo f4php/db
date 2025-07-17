@@ -8,6 +8,7 @@ use F4\Config;
 use F4\DB\Adapter\AdapterInterface;
 use F4\DB\PreparedStatement;
 
+use DateTime;
 use ErrorException;
 use InvalidArgumentException;
 use Throwable;
