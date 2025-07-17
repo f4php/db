@@ -1,10 +1,10 @@
 # Overview
 
-DB is a database query builder, core package for [F4](https://github.com/f4php/f4), a lightweight web development framework.
+**DB** is a database query builder and a core package of [F4](https://github.com/f4php/f4), a lightweight web development framework.
 
 ## Configuration
 
-DB relies on the following constants in your environment config:
+DB relies on the following constants defined in your environment configuration:
 
 ```php
 
@@ -27,11 +27,11 @@ class Config {
 
 ## Key Concepts
 
-DB tries to recreate SQL syntax in PHP-native expressions as much as possible.
+DB aims to replicate SQL syntax using native PHP expressions as closely as possible.
 
-DB is focused around PostgreSQL syntax and hasn't been tested with other DBMS's, although an `Adapter` approach allows a developer to use other database engines.
+It is primarily focused on PostgreSQL syntax and has not been tested with other DBMSs. However, its adapter-based architecture enables support for other database engines.
 
-Currently, DB supports a substantial but still limited subset of SQL syntax, which grows slowly as new features are added.
+DB currently supports a significant but still limited subset of SQL syntax, which is gradually expanding as new features are added.
 
 Currently supported keywords are:
 
@@ -79,7 +79,7 @@ Currently supported keywords are:
 `with()`,
 `withRecursive()`
 
-Additionally, the following methods support static invokation:
+The following methods support static invokation:
 
 `DB::raw()`,
 `DB::delete()`,
@@ -94,13 +94,13 @@ Additionally, the following methods support static invokation:
 `DB::with()`,
 `DB::withRecursive()`
 
-It is the developer's responsibility to follow SQL grammar when daisy-chaining DB method calls.
+It is the developer's responsibility to maintain valid SQL grammar when chaining DB method calls.
 
 ## Placeholders
 
-DB utilizes a concept of placeholders, which follow custom (non-standard) syntax convention to allow a developer to place/substitute variable values in a query as subqueries or (potentially) complex bound parameters.
+DB introduces a custom (non-standard) placeholder syntax that allows substitution of variable values, subqueries, or complex bound parameters.
 
-Three types of placeholders are supported:
+Three placeholder types are supported:
 
 `{#}` for a scalar value
 
@@ -108,11 +108,11 @@ Three types of placeholders are supported:
 
 `{#::#}` for a DB object instance
 
-Please see the Usage Examples section below for more details.
+Refer to the Usage Examples section below for practical demonstration.
 
 ## Getting Results
 
-When query is built, you may want to use the following tail methods to fetch results:
+After building a query, the following tail methods are available for fetching results:
 
 `$db->asTable()` to fetch all rows
 
@@ -128,6 +128,42 @@ When query is built, you may want to use the following tail methods to fetch res
 
 `$db->getPreparedStatement()->parameters` returns an array of statement-bound parameters
 
+## Data Types
+
+DB attempts to cast returned values to appropriate PHP types, but since PHP and DBMS type systems are not fully compatible, some inconsistencies may occur.
+
+The PostgreSQL adapter automatically applies the following casting rules:
+
+```php
+    case 'smallint':
+    case 'smallserial':
+    case 'integer':
+    case 'serial':
+    case 'bigint':
+    case 'bigserial':
+    case 'int2':
+    case 'int4':
+    case 'int8':
+        $value = (int) $value;
+        break;
+    case 'real':
+    case 'double precision':
+        $value = (float) $value;
+        break;
+    case 'json':
+    case 'jsonb':
+        $value = json_decode(json: $value, associative: true, flags: JSON_THROW_ON_ERROR);
+        break;
+    case 'boolean':
+    case 'bool':
+        $value = match ($value) {
+            't' => true,
+            'f' => false,
+            default => null
+        };
+        break;
+```
+
 ## Usage Examples
 
 ### Simple Query
@@ -142,13 +178,12 @@ $rows = DB::select()
     ->asTable();
 ```
 
-This will expand to the following SQL statement:
+This code will internally expand to the following SQL statement:
 
 ```sql
   SELECT * FROM "table1" AS "t1" RIGHT JOIN "table2" AS "t2" USING ("fieldA", "fieldB")
 ```
-
-and fetch all available rows as a multi-dimensional php array.
+and fetch all available rows as a multi-dimensional PHP array.
 
 ### Slightly More Complex Query
 
@@ -172,7 +207,7 @@ $rows = DB::with([
                 ->from('risk')
                 ->where([
                     '"project"."projectUUID" = "risk"."projectUUID"',
-                    '"handled" = false',
+                    'handled' => false,
                 ]),
         ])
         ->on('true')
