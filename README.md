@@ -135,6 +135,7 @@ DB attempts to cast returned values to appropriate PHP types, but since PHP and 
 The PostgreSQL adapter automatically applies the following casting rules:
 
 ```php
+  switch ($type) {
     case 'smallint':
     case 'smallserial':
     case 'integer':
@@ -162,6 +163,8 @@ The PostgreSQL adapter automatically applies the following casting rules:
             default => null
         };
         break;
+    default:
+  }
 ```
 
 ## Usage Examples
@@ -207,7 +210,8 @@ $rows = DB::with([
                 ->from('risk')
                 ->where([
                     '"project"."projectUUID" = "risk"."projectUUID"',
-                    'handled' => false,
+                    'handled' => false, // Note: subquery placeholder ensures that all subquery parameters
+                                        // are correctly bound and processed in the main query
                 ]),
         ])
         ->on('true')
