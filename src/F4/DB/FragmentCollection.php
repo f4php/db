@@ -62,7 +62,7 @@ class FragmentCollection implements FragmentCollectionInterface, FragmentInterfa
     }
     public function getParameters(): array
     {
-        return array_reduce($this->fragments, function ($result, FragmentInterface $fragment): array {
+        return array_reduce($this->fragments, function (array $result, FragmentInterface $fragment): array {
             return [...$result, ...$fragment->getParameters()];
         }, []);
     }
