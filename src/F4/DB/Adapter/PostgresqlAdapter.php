@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace F4\DB\Adapter;
 
-use F4\Config;
-use F4\DB\Adapter\AdapterInterface;
-use F4\DB\PreparedStatement;
-
 use DateTime;
 use ErrorException;
 use InvalidArgumentException;
 use Throwable;
+use F4\Config;
+use F4\DB\Adapter\AdapterInterface;
 use F4\DB\Exception\DuplicateColumnException;
 use F4\DB\Exception\DuplicateFunctionException;
 use F4\DB\Exception\DuplicateRecordException;
@@ -24,6 +22,7 @@ use F4\DB\Exception\SyntaxErrorException;
 use F4\DB\Exception\UnknownColumnException;
 use F4\DB\Exception\UnknownFunctionException;
 use F4\DB\Exception\UnknownTableException;
+use F4\DB\PreparedStatement;
 
 use PgSql\Connection;
 use PgSql\Result;
@@ -36,6 +35,7 @@ use function is_float;
 use function is_int;
 use function is_resource;
 use function is_scalar;
+use function json_decode;
 use function mb_substr;
 use function mb_trim;
 use function pg_get_result;
@@ -174,7 +174,6 @@ class PostgresqlAdapter implements AdapterInterface
         }
         return $value;
     }
-
     protected function convertErrorToException(string $code, string $message): Throwable
     {
         return match ($code) {
@@ -192,7 +191,6 @@ class PostgresqlAdapter implements AdapterInterface
             default => new Exception(message: sprintf("Database error %s, %s", $code, $message))
         };
     }
-
     public function connect(string $connectionString, int $connectionFlags = 0): Connection
     {
         $connection = null;
@@ -252,10 +250,8 @@ class PostgresqlAdapter implements AdapterInterface
                 }
         };
     }
-
     public function getEscapedIdentifier(mixed $value): string
     {
         return pg_escape_identifier($this->connection, (string) $value);
     }
-
 }

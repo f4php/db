@@ -111,7 +111,7 @@ class Fragment implements FragmentInterface
     }
     public function getQuery(): string
     {
-        return match (empty($this->query)) {
+        return match ($this->query === '') {
             true => '',
             default => match ($this->prefix) {
                     null => $this->query,
