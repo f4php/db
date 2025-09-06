@@ -8,6 +8,9 @@ use Composer\Pcre\Preg;
 use F4\DB\Reference\ColumnReference;
 use InvalidArgumentException;
 
+use function array_filter;
+use function array_map;
+use function implode;
 use function is_array;
 use function is_numeric;
 use function is_scalar;
@@ -30,14 +33,19 @@ class ConditionCollection extends FragmentCollection
     }
     public function getQuery(): string
     {
-        return match (empty($query = implode(static::GLUE, array_filter(array_map(function (FragmentInterface $fragment): string {
-            return $fragment->getQuery();
-        }, $this->fragments))))) {
+        $query = implode(static::GLUE, array_filter(
+            array_map(
+                fn (FragmentInterface $fragment): string => $fragment->getQuery(), 
+                $this->fragments
+            ),
+            fn($query) => $query !== '')
+        );
+        return match ($query === '') {
             true => '',
             default => match ($this->prefix) {
-                    null => sprintf('(%s)', Preg::replace('/^\((.*)\)$/', '$1', $query)),
-                    default => sprintf('%s %s', $this->prefix, $query)
-                }
+                null => sprintf('(%s)', Preg::replace('/^\((.*)\)$/', '$1', $query)),
+                default => sprintf('%s %s', $this->prefix, $query)
+            }
         };
     }
     static public function of(...$arguments): ConditionCollection

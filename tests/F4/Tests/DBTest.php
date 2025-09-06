@@ -24,6 +24,12 @@ final class DBTest extends TestCase
         $this->assertSame(1, $db2->getPreparedStatement()->parameters[0]);
         $this->assertSame(2, $db2->getPreparedStatement()->parameters[1]);
         $this->assertSame('abc', $db2->getPreparedStatement()->parameters[2]);
+        $db3 = DB::select();
+        $this->assertSame('SELECT *', $db3->getPreparedStatement()->query);
+        $db4 = DB::select('*');
+        $this->assertSame('SELECT *', $db4->getPreparedStatement()->query);
+        $db5 = DB::select(0);
+        $this->assertSame('SELECT 0', $db5->getPreparedStatement()->query);
     }
     public function testSelectWithPlaceholders(): void
     {

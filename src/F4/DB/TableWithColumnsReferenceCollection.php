@@ -28,7 +28,6 @@ class TableWithColumnsReferenceCollection extends FragmentCollection
     {
         $this->addExpression($arguments);
     }
-
     public function addExpression(mixed $expression): void
     {
         if (is_array($expression)) {

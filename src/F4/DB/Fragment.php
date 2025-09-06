@@ -114,9 +114,9 @@ class Fragment implements FragmentInterface
         return match ($this->query === '') {
             true => '',
             default => match ($this->prefix) {
-                    null => $this->query,
-                    default => sprintf('%s %s', $this->prefix, $this->query)
-                }
+                null => $this->query,
+                default => sprintf('%s %s', $this->prefix, $this->query)
+            }
         };
     }
     public function setQuery(string $query, array $parameters = []): static

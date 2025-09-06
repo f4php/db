@@ -27,9 +27,14 @@ class Parenthesize extends FragmentCollection
     }
     public function getQuery(): string
     {
-        return match (empty($query = implode(static::GLUE, array_filter(array_map(function (FragmentInterface $fragment): string {
-            return $fragment->getQuery();
-        }, $this->fragments))))) {
+        $query = implode(static::GLUE, array_filter(
+            array_map(
+                fn (FragmentInterface $fragment): string => $fragment->getQuery(), 
+                $this->fragments
+            ),
+            fn($query) => $query !== '')
+        );
+        return match ($query === '') {
             true => '',
             default => match ($this->prefix) {
                     null => sprintf("(%s)", $query),
