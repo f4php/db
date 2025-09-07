@@ -33,7 +33,7 @@ use function preg_quote;
  */
 class Fragment implements FragmentInterface
 {
-    protected string $query;
+    protected string $query = '';
     protected ?string $prefix = null;
     protected array $parameters = [];
     public const string SINGLE_PARAMETER_PLACEHOLDER = '{#}';

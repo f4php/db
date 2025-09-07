@@ -35,7 +35,7 @@ class ConditionCollection extends FragmentCollection
     {
         $query = implode(static::GLUE, array_filter(
             array_map(
-                fn (FragmentInterface $fragment): string => $fragment->getQuery(), 
+                fn (FragmentInterface $fragment): string => $fragment->getQuery(),
                 $this->fragments
             ),
             fn($query) => $query !== '')
