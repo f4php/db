@@ -81,7 +81,7 @@ class Fragment implements FragmentInterface
     public static function extractPlaceholders(string $query): array
     {
         $regExpPattern = self::getPlaceholderRegExp();
-        return match (Preg::matchAll(pattern: "/({$regExpPattern})/u", subject: $query, matches: $matches)) {
+        return match (Preg::isMatchAll(pattern: "/({$regExpPattern})/u", subject: $query, matches: $matches)) {
             false => [],
             default => $matches[1] ?? []
         };

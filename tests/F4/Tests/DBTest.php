@@ -173,6 +173,8 @@ final class DBTest extends TestCase
             ])
             ->from('table2 t2');
         $this->assertSame('INSERT INTO "table1" AS "t1" ("fieldA", "fieldB", "fieldC") SELECT "fieldA", "fieldB", "fieldC" FROM "table2" AS "t2"', $db4->getPreparedStatement()->query);
+        $db5 = DB::insert()->into('table1 t1')->values(['fieldA' => new Fragment('CURRENT_TIMESTAMP')]);
+        $this->assertSame('INSERT INTO "table1" AS "t1" ("fieldA") VALUES (CURRENT_TIMESTAMP)', $db5->getPreparedStatement()->query);
     }
     public function testUpdate(): void
     {
