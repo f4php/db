@@ -52,6 +52,10 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
     public function __call(string $method, array $arguments): static
     {
         match ($method) {
+            'crossJoin' => $this
+                ->append((new TableReferenceCollection(...$arguments))->withPrefix('CROSS JOIN')),
+            'crossJoinLateral' => $this
+                ->append((new TableReferenceCollection(...$arguments))->withPrefix('CROSS JOIN LATERAL')),
             'delete' => $this
                 ->append('DELETE'),
             'doNothing' => $this
@@ -113,6 +117,10 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
                 },
             'having' => $this
                 ->append((new ConditionCollection(...$arguments))->withPrefix('HAVING')),
+            'innerJoin' => $this
+                ->append((new TableReferenceCollection(...$arguments))->withPrefix('INNER JOIN')),
+            'innerJoinLateral' => $this
+                ->append((new TableReferenceCollection(...$arguments))->withPrefix('INNER JOIN LATERAL')),
             'insert' => $this
                 ->append('INSERT')
             && $this->resetAllFragmentCollectionsNames(), // resets the possibility to expand any previously added collection
@@ -125,6 +133,8 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
                 ->append((new TableWithColumnsReferenceCollection(...$arguments))->withPrefix('INTO')),
             'join' => $this
                 ->append((new TableReferenceCollection(...$arguments))->withPrefix('JOIN')),
+            'joinLateral' => $this
+                ->append((new TableReferenceCollection(...$arguments))->withPrefix('JOIN LATERAL')),
             'leftJoin' => $this
                 ->append((new TableReferenceCollection(...$arguments))->withPrefix('LEFT JOIN')),
             'leftJoinLateral' => $this
@@ -139,6 +149,12 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
                                 default => sprintf('LIMIT %d OFFSET %d', $arguments[0], $arguments[1])
                             },
                     }),
+            'naturalJoin' => $this
+                ->append((new TableReferenceCollection(...$arguments))->withPrefix('NATURAL JOIN')),
+            'naturalLeftOuterJoin' => $this
+                ->append((new TableReferenceCollection(...$arguments))->withPrefix('NATURAL LEFT OUTER JOIN')),
+            'naturalRightOuterJoin' => $this
+                ->append((new TableReferenceCollection(...$arguments))->withPrefix('NATURAL RIGHT OUTER JOIN')),
             'offset' => $this
                 ->append(match (!isset($arguments[0]) || !is_int($arguments[0])) {
                         true => throw new InvalidArgumentException('Offset must have exactly one integer argument'),

@@ -207,10 +207,28 @@ final class DBTest extends TestCase
         $this->assertSame('SELECT * FROM "table1" AS "t1" RIGHT JOIN "table2" AS "t2" USING ("fieldA", "fieldB")', $db4->getPreparedStatement()->query);
         $db5 = DB::select()->from('table1 t1')->rightOuterJoin("table2 t2")->using('fieldA', 'fieldB');
         $this->assertSame('SELECT * FROM "table1" AS "t1" RIGHT OUTER JOIN "table2" AS "t2" USING ("fieldA", "fieldB")', $db5->getPreparedStatement()->query);
-        $db1 = DB::select()->from('table1 t1')->join("table2 t2")->on(['fieldA' => 'abc', '"fieldB" > {#}' => 4]);
-        $this->assertSame('SELECT * FROM "table1" AS "t1" JOIN "table2" AS "t2" ON "fieldA" = $1 AND "fieldB" > $2', $db1->getPreparedStatement()->query);
-        $this->assertSame('abc', $db1->getPreparedStatement()->parameters[0]);
-        $this->assertSame(4, $db1->getPreparedStatement()->parameters[1]);
+        $db6 = DB::select()->from('table1 t1')->join("table2 t2")->on(['fieldA' => 'abc', '"fieldB" > {#}' => 4]);
+        $this->assertSame('SELECT * FROM "table1" AS "t1" JOIN "table2" AS "t2" ON "fieldA" = $1 AND "fieldB" > $2', $db6->getPreparedStatement()->query);
+        $this->assertSame('abc', $db6->getPreparedStatement()->parameters[0]);
+        $this->assertSame(4, $db6->getPreparedStatement()->parameters[1]);
+        $db7 = DB::select()->from('table1 t1')->crossJoin("table2 t2");
+        $this->assertSame('SELECT * FROM "table1" AS "t1" CROSS JOIN "table2" AS "t2"', $db7->getPreparedStatement()->query);
+        $db8 = DB::select()->from('table1 t1')->innerJoin("table2 t2");
+        $this->assertSame('SELECT * FROM "table1" AS "t1" INNER JOIN "table2" AS "t2"', $db8->getPreparedStatement()->query);
+        $db9 = DB::select()->from('table1 t1')->naturalJoin("table2 t2");
+        $this->assertSame('SELECT * FROM "table1" AS "t1" NATURAL JOIN "table2" AS "t2"', $db9->getPreparedStatement()->query);
+        $db10 = DB::select()->from('table1 t1')->naturalLeftOuterJoin("table2 t2");
+        $this->assertSame('SELECT * FROM "table1" AS "t1" NATURAL LEFT OUTER JOIN "table2" AS "t2"', $db10->getPreparedStatement()->query);
+        $db11 = DB::select()->from('table1 t1')->naturalRightOuterJoin("table2 t2");
+        $this->assertSame('SELECT * FROM "table1" AS "t1" NATURAL RIGHT OUTER JOIN "table2" AS "t2"', $db11->getPreparedStatement()->query);
+        $db12 = DB::select()->from('table1 t1')->joinLateral("table2 t2");
+        $this->assertSame('SELECT * FROM "table1" AS "t1" JOIN LATERAL "table2" AS "t2"', $db12->getPreparedStatement()->query);
+        $db13 = DB::select()->from('table1 t1')->leftJoinLateral("table2 t2");
+        $this->assertSame('SELECT * FROM "table1" AS "t1" LEFT JOIN LATERAL "table2" AS "t2"', $db13->getPreparedStatement()->query);
+        $db14 = DB::select()->from('table1 t1')->innerJoinLateral("table2 t2");
+        $this->assertSame('SELECT * FROM "table1" AS "t1" INNER JOIN LATERAL "table2" AS "t2"', $db14->getPreparedStatement()->query);
+        $db15 = DB::select()->from('table1 t1')->crossJoinLateral("table2 t2");
+        $this->assertSame('SELECT * FROM "table1" AS "t1" CROSS JOIN LATERAL "table2" AS "t2"', $db15->getPreparedStatement()->query);
     }
     public function testDelete(): void
     {

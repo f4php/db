@@ -152,6 +152,9 @@ class PostgresqlAdapter implements AdapterInterface
                 case 'double precision':
                     $value = (float) $value;
                     break;
+                case 'numeric':
+                    // doesn't match any native php type, should remain as is (presumably, a string) for versatility
+                    break;
                 case 'json':
                 case 'jsonb':
                     $value = json_decode(json: $value, associative: true, flags: JSON_THROW_ON_ERROR);
@@ -164,7 +167,7 @@ class PostgresqlAdapter implements AdapterInterface
                         default => null
                     };
                     break;
-                // TODO: process psql arrays http://stackoverflow.com/questions/9169176/accessing-psql-array-directly-in-php
+                // TODO: process pgsql arrays http://stackoverflow.com/questions/9169176/accessing-psql-array-directly-in-php
                 //        case '_text':
                 //                  if($parts='')
                 //                    $value=$this->castType($parts, $type);

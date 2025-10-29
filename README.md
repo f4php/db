@@ -35,6 +35,8 @@ DB currently supports a significant but still limited subset of SQL syntax, whic
 
 Currently supported keywords are:
 
+`crossJoin()`,
+`crossJoinLateral()`,
 `delete()`,
 `doNothing()`,
 `doUpdateSet()`,
@@ -50,15 +52,21 @@ Currently supported keywords are:
 `groupByAll()`,
 `groupByDistinct()`,
 `having()`,
+`innerJoin()`,
+`innerJoinLateral()`,
 `insert()`,
 `intersect()`,
 `intersectAll()`,
 `into()`,
 `join()`,
+`joinLateral()`,
 `leftJoin()`,
 `leftJoinLateral()`,
 `leftOuterJoin()`,
 `limit()`,
+`naturalJoin()`,
+`naturalLeftOuterJoin()`,
+`naturalRightOuterJoin()`,
 `offset()`,
 `on()`,
 `onConflict()`,
@@ -150,6 +158,9 @@ The PostgreSQL adapter automatically applies the following casting rules:
     case 'real':
     case 'double precision':
         $value = (float) $value;
+        break;
+    case 'numeric':
+        // doesn't match any native php type, should remain as is (presumably, a string) for versatility
         break;
     case 'json':
     case 'jsonb':
