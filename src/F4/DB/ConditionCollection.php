@@ -6,6 +6,10 @@ namespace F4\DB;
 
 use Composer\Pcre\Preg;
 use F4\DB\Reference\ColumnReference;
+use F4\DB\Fragment;
+use F4\DB\FragmentCollection;
+use F4\DB\FragmentInterface;
+use F4\DB\StaticOfMethodTrait;
 use InvalidArgumentException;
 
 use function array_filter;
@@ -26,6 +30,7 @@ use function sprintf;
  */
 class ConditionCollection extends FragmentCollection
 {
+    use StaticOfMethodTrait;
     protected const string GLUE = ' AND ';
     public function __construct(...$arguments)
     {
@@ -34,11 +39,11 @@ class ConditionCollection extends FragmentCollection
     public function getQuery(): string
     {
         $query = implode(static::GLUE, array_filter(
-            array_map(
-                fn (FragmentInterface $fragment): string => $fragment->getQuery(),
-                $this->fragments
+            array: array_map(
+                callback: fn (FragmentInterface $fragment): string => $fragment->getQuery(),
+                array: $this->fragments
             ),
-            fn($query) => $query !== '')
+            callback: fn($query) => $query !== '')
         );
         return match ($query === '') {
             true => '',
@@ -47,11 +52,6 @@ class ConditionCollection extends FragmentCollection
                 default => sprintf('%s %s', $this->prefix, $query)
             }
         };
-    }
-    static public function of(...$arguments): ConditionCollection
-    {
-        $instance = new self(...$arguments);
-        return $instance;
     }
     public function addExpression(mixed $expression): void
     {

@@ -10,6 +10,7 @@ use F4\DB;
 use F4\DB\Fragment;
 use F4\DB\AnyConditionCollection as any;
 use F4\DB\ConditionCollection as all;
+use F4\DB\NoneConditionCollection as none;
 
 final class DBTest extends TestCase
 {
@@ -108,13 +109,14 @@ final class DBTest extends TestCase
         $this->assertSame('SELECT * FROM "table" WHERE "a" = $1 AND ("b" = $2 OR "c" IN ($3,$4,$5) OR ("g" > $6 AND "h" = $7))', $db4->getPreparedStatement()->query);
         $db5 = DB::select()->from('table')->where(['a' => null]);
         $this->assertSame('SELECT * FROM "table" WHERE "a" IS NULL', $db5->getPreparedStatement()->query);
+        $db6 = DB::select()->from('table')->where(['a' => 1])->where(none::of(['b' => 2, 'c' => ['3', 4, 'def']]));
+        $this->assertSame('SELECT * FROM "table" WHERE "a" = $1 AND NOT ("b" = $2 AND "c" IN ($3,$4,$5))', $db6->getPreparedStatement()->query);
     }
     public function testSimpleWith(): void
     {
         $db1 = DB::with(['table' => DB::select()->from('t')])->select()->from('table');
         $this->assertSame('WITH "table" AS (SELECT * FROM "t") SELECT * FROM "table"', $db1->getPreparedStatement()->query);
     }
-
     public function testUnionExceptIntersect(): void
     {
         $db1 = DB::select()->from('t1')->union()->select()->from('t2');
@@ -134,7 +136,6 @@ final class DBTest extends TestCase
         $this->assertSame('SELECT * FROM "t1" UNION SELECT * FROM "t2" INTERSECT SELECT * FROM "t3" EXCEPT SELECT * FROM "t4"', $db7->getPreparedStatement()->query);
         $this->assertSame('SELECT * FROM "t1" WHERE "a" = $1 UNION SELECT * FROM "t2" WHERE "b" = $2', $db8->getPreparedStatement()->query);
     }
-
     public function testGroupByHaving(): void
     {
         $db1 = DB::select()->from('t1')->group('a', 'b', 'c')->having(['d > {#}' => 7]);
@@ -143,7 +144,6 @@ final class DBTest extends TestCase
         $this->assertSame('SELECT * FROM "t1" GROUP BY ("a", "b", "c") HAVING d > $1', $db2->getPreparedStatement()->query);
         $this->assertSame(7, $db2->getPreparedStatement()->parameters[0]);
     }
-
     public function testInsert(): void
     {
         $db1 = DB::insert()->into('table1 t1')->values(['fieldA' => 1, 'fieldB' => 'abc', 'fieldC' => 'defg'])->where(['fieldD' => 5, '"fieldE" > {#}' => 7])->onConflict('fieldF')->doUpdateSet(['fieldG' => 2])->returning('fieldH');
@@ -286,5 +286,4 @@ final class DBTest extends TestCase
         $identifier1 = DB::escapeIdentifier('table"name');
         $this->assertSame('"table""name"', $identifier1);
     }
-
 }

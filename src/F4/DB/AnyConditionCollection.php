@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace F4\DB;
 
 use F4\DB\ConditionCollection;
+use F4\DB\StaticOfMethodTrait;
 
 /**
  * 
@@ -16,12 +17,7 @@ use F4\DB\ConditionCollection;
  */
 class AnyConditionCollection extends ConditionCollection
 {
+    use StaticOfMethodTrait;
     protected const string GLUE = ' OR ';
-    static public function of(...$arguments): ConditionCollection
-    {
-        $instance = new self(...$arguments);
-        return $instance;
-    }
-
 }
 
