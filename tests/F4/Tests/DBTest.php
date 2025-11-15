@@ -110,7 +110,7 @@ final class DBTest extends TestCase
         $db5 = DB::select()->from('table')->where(['a' => null]);
         $this->assertSame('SELECT * FROM "table" WHERE "a" IS NULL', $db5->getPreparedStatement()->query);
         $db6 = DB::select()->from('table')->where(['a' => 1])->where(none::of(['b' => 2, 'c' => ['3', 4, 'def']]));
-        $this->assertSame('SELECT * FROM "table" WHERE "a" = $1 AND NOT ("b" = $2 AND "c" IN ($3,$4,$5))', $db6->getPreparedStatement()->query);
+        $this->assertSame('SELECT * FROM "table" WHERE "a" = $1 AND NOT ("b" = $2 OR "c" IN ($3,$4,$5))', $db6->getPreparedStatement()->query);
     }
     public function testSimpleWith(): void
     {

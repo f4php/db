@@ -20,7 +20,7 @@ use F4\DB\StaticOfMethodTrait;
 class NoneConditionCollection extends ConditionCollection
 {
     use StaticOfMethodTrait;
-    protected const string GLUE = ' AND ';
+    protected const string GLUE = ' OR ';
     public function getQuery(): string
     {
         $query = implode(static::GLUE, array_filter(
