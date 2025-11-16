@@ -48,7 +48,10 @@ class ConditionCollection extends FragmentCollection
         return match ($query === '') {
             true => '',
             default => match ($this->prefix) {
-                null => sprintf('(%s)', Preg::replace('/^\((.*)\)$/', '$1', $query)),
+                null => sprintf('(%s)', match(Preg::isMatch('/^\([^\)]+\)$/', $query)) {
+                    true => Preg::replace('/^\((.*)\)$/', '$1', $query),
+                    default => $query,
+                }),
                 default => sprintf('%s %s', $this->prefix, $query)
             }
         };
