@@ -302,7 +302,7 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
         };
         return $this;
     }
-    public static function __callStatic(string $method, array $arguments): DB
+    public static function __callStatic(string $method, array $arguments): mixed
     {
         return match ($method) {
             'raw',
@@ -322,7 +322,7 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
             => throw new BadMethodCallException(message: "Unsupported method {$method}()")
         };
     }
-    public function commit(?int $stopAfter = null): DB
+    public function commit(?int $stopAfter = null): mixed
     {
         $preparedStatement = $this->getPreparedStatement($this->adapter->enumerateParameters(...));
         HookManager::triggerHook(HookManager::BEFORE_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters]);
@@ -330,15 +330,15 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
         HookManager::triggerHook(HookManager::AFTER_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters, 'result' => $result]);
         return $result;
     }
-    public function asTable(): DB
+    public function asTable(): mixed
     {
         return $this->commit();
     }
-    public function asRow(): DB
+    public function asRow(): mixed
     {
         return $this->commit(stopAfter: 1)[0] ?? null;
     }
-    public function asValue(string|int $index = 0): DB
+    public function asValue(string|int $index = 0): mixed
     {
         return match (is_int($index)) {
             true => array_values($this->commit(stopAfter: 1)[0] ?? [])[$index] ?? null,
@@ -348,7 +348,7 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
     public function asSQL(): string
     {
         $parameters = $this->getPreparedStatement()->parameters;
-        $escapedParametersEnumerator = function (DB $index) use ($parameters): DB {
+        $escapedParametersEnumerator = function (mixed $index) use ($parameters): mixed {
             if (!array_key_exists($index - 1, $parameters)) {
                 throw new InvalidArgumentException('Unexpected parameter index');
             }
