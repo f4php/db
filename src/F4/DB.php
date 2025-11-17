@@ -338,7 +338,7 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
     {
         return $this->commit(stopAfter: 1)[0] ?? null;
     }
-    public function asValue(DB $index = 0): DB
+    public function asValue(string|int $index = 0): DB
     {
         return match (is_int($index)) {
             true => array_values($this->commit(stopAfter: 1)[0] ?? [])[$index] ?? null,
