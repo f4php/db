@@ -41,6 +41,72 @@ use function is_int;
  * @package F4\DB
  * @author Dennis Kreminsky <dennis@kreminsky.com>
  * 
+ * @method static DB raw(...$args)
+ * @method static DB delete(...$args)
+ * @method static DB dropTable(...$args)
+ * @method static DB dropTableIfExists(...$args)
+ * @method static DB dropTableWithCascade(...$args)
+ * @method static DB dropTableIfExistsWithCascade(...$args)
+ * @method static DB insert(...$args)
+ * @method static DB select(...$args)
+ * @method static DB selectDistinct(...$args)
+ * @method static DB update(...$args)
+ * @method static DB with(...$args)
+ * @method static DB withRecursive(...$args)
+ *
+ * @method DB crossJoin(...$args)
+ * @method DB crossJoinLateral(...$args)
+ * @method DB delete(...$args)
+ * @method DB doNothing(...$args)
+ * @method DB doUpdateSet(...$args)
+ * @method DB dropTable(...$args)
+ * @method DB dropTableIfExists(...$args)
+ * @method DB dropTableWithCascade(...$args)
+ * @method DB dropTableIfExistsWithCascade(...$args)
+ * @method DB except(...$args)
+ * @method DB exceptAll(...$args)
+ * @method DB from(...$args)
+ * @method DB fullOuterJoin(...$args)
+ * @method DB group(...$args)
+ * @method DB groupBy(...$args)
+ * @method DB groupByAll(...$args)
+ * @method DB groupByDistinct(...$args)
+ * @method DB having(...$args)
+ * @method DB innerJoin(...$args)
+ * @method DB innerJoinLateral(...$args)
+ * @method DB intersect(...$args)
+ * @method DB intersectAll(...$args)
+ * @method DB into(...$args)
+ * @method DB join(...$args)
+ * @method DB joinLateral(...$args)
+ * @method DB leftJoin(...$args)
+ * @method DB leftJoinLateral(...$args)
+ * @method DB leftOuterJoin(...$args)
+ * @method DB limit(...$args)
+ * @method DB naturalJoin(...$args)
+ * @method DB naturalLeftOuterJoin(...$args)
+ * @method DB naturalRightOuterJoin(...$args)
+ * @method DB offset(...$args)
+ * @method DB on(...$args)
+ * @method DB onConflict(...$args)
+ * @method DB order(...$args)
+ * @method DB orderBy(...$args)
+ * @method DB raw(...$args)
+ * @method DB returning(...$args)
+ * @method DB rightJoin(...$args)
+ * @method DB rightOuterJoin(...$args)
+ * @method DB select(...$args)
+ * @method DB selectDistinct(...$args)
+ * @method DB set(...$args)
+ * @method DB update(...$args)
+ * @method DB union(...$args)
+ * @method DB unionAll(...$args)
+ * @method DB using(...$args)
+ * @method DB values(...$args)
+ * @method DB where(...$args)
+ * @method DB with(...$args)
+ * @method DB withRecursive(...$args)
+ *
  */
 class DB extends FragmentCollection implements FragmentCollectionInterface, FragmentInterface
 {
@@ -236,7 +302,7 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
         };
         return $this;
     }
-    public static function __callStatic(string $method, array $arguments): mixed
+    public static function __callStatic(string $method, array $arguments): DB
     {
         return match ($method) {
             'raw',
@@ -256,7 +322,7 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
             => throw new BadMethodCallException(message: "Unsupported method {$method}()")
         };
     }
-    public function commit(?int $stopAfter = null): mixed
+    public function commit(?int $stopAfter = null): DB
     {
         $preparedStatement = $this->getPreparedStatement($this->adapter->enumerateParameters(...));
         HookManager::triggerHook(HookManager::BEFORE_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters]);
@@ -264,15 +330,15 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
         HookManager::triggerHook(HookManager::AFTER_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters, 'result' => $result]);
         return $result;
     }
-    public function asTable(): mixed
+    public function asTable(): DB
     {
         return $this->commit();
     }
-    public function asRow(): mixed
+    public function asRow(): DB
     {
         return $this->commit(stopAfter: 1)[0] ?? null;
     }
-    public function asValue(mixed $index = 0): mixed
+    public function asValue(DB $index = 0): DB
     {
         return match (is_int($index)) {
             true => array_values($this->commit(stopAfter: 1)[0] ?? [])[$index] ?? null,
@@ -282,7 +348,7 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
     public function asSQL(): string
     {
         $parameters = $this->getPreparedStatement()->parameters;
-        $escapedParametersEnumerator = function (mixed $index) use ($parameters): mixed {
+        $escapedParametersEnumerator = function (DB $index) use ($parameters): DB {
             if (!array_key_exists($index - 1, $parameters)) {
                 throw new InvalidArgumentException('Unexpected parameter index');
             }
