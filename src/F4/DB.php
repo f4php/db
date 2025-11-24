@@ -33,6 +33,7 @@ use function array_values;
 use function call_user_func_array;
 use function is_array;
 use function is_int;
+use function is_string;
 
 /**
  * 
@@ -111,9 +112,12 @@ use function is_int;
 class DB extends FragmentCollection implements FragmentCollectionInterface, FragmentInterface
 {
     protected AdapterInterface $adapter;
-    public function __construct(?string $connectionString = null, string $adapterClass = Config::DB_ADAPTER_CLASS)
+    public function __construct(?string $connectionString = null, string|AdapterInterface $adapter = Config::DB_ADAPTER_CLASS)
     {
-        $this->adapter = new $adapterClass($connectionString);
+        $this->adapter = match (is_string($adapter)) {
+            true => new $adapter($connectionString),
+            default => $adapter,
+        };
     }
     public function __call(string $method, array $arguments): static
     {

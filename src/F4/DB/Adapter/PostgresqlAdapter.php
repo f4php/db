@@ -64,20 +64,27 @@ use function sprintf;
 class PostgresqlAdapter implements AdapterInterface
 {
     protected Connection $connection;
+    protected ?string $connectionString;
+    protected int $connectionFlags;
 
     public function __construct(?string $connectionString = null, int $connectionFlags = 0)
     {
-        $connectionString = match (!empty($connectionString)) {
+        $this->connectionString = match (!empty($connectionString)) {
             true => $connectionString,
             default => match (mb_substr(mb_trim(Config::DB_HOST), 0, 1) === '/') {
                     true => sprintf("host='%s' dbname='%s' user='%s' password='%s'", Config::DB_HOST, Config::DB_NAME, Config::DB_USERNAME, Config::DB_PASSWORD),
                     default => sprintf("host='%s' port='%s' dbname='%s' user='%s' password='%s'", Config::DB_HOST, Config::DB_PORT, Config::DB_NAME, Config::DB_USERNAME, Config::DB_PASSWORD)
                 }
         };
-        $this->connection = $this->connect(connectionString: $connectionString, connectionFlags: $connectionFlags);
+        $this->connectionFlags = $connectionFlags;
     }
     public function execute(PreparedStatement $statement, ?int $stopAfter = null): mixed
     {
+        if(!$this->connection) {
+            if (!$this->connection = $this->connect(connectionString: $this->connectionString, connectionFlags: $this->connectionFlags)) {
+                throw new ErrorException('Failed to connect to the database', 500);
+            }
+        }
         $query = $statement->query;
         // native booleans are passed as empty strings by default, which requires a workaround
         $parameters = array_map(function ($parameter) {
@@ -86,10 +93,6 @@ class PostgresqlAdapter implements AdapterInterface
                 default => $parameter
             };
         }, $statement->parameters);
-
-        if (!isset($this->connection)) {
-            throw new ErrorException('Database connection not set', 500);
-        }
         if (
             (count($parameters) && !pg_send_query_params($this->connection, $query, $parameters))
             ||
