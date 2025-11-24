@@ -80,7 +80,7 @@ class PostgresqlAdapter implements AdapterInterface
         };
         $this->connectionFlags = $connectionFlags;
     }
-    public function execute(PreparedStatement $statement, ?int $stopAfter = null): mixed
+    public function execute(PreparedStatement $statement, ?int $stopAfter = null): array
     {
         if (!$this->connection) {
             throw new ErrorException('Failed to connect to the database', 500);
@@ -100,15 +100,17 @@ class PostgresqlAdapter implements AdapterInterface
         ) {
             throw new Exception(message: pg_last_error($this->connection), code: 500);
         }
-        $result = pg_get_result($this->connection);
-        if ($result !== false && !is_resource($result) && (!$result instanceof Result)) {
+        if(($result = pg_get_result($this->connection)) === FALSE) {
+            return [];
+        }
+        if (!is_resource($result) && (!$result instanceof Result)) {
             throw new Exception(message: pg_last_error($this->connection), code: 500);
         }
-        if (($result !== false) && ($code = pg_result_error_field($result, PGSQL_DIAG_SQLSTATE)) !== null) {
+        if (($code = pg_result_error_field($result, PGSQL_DIAG_SQLSTATE)) !== null) {
             throw $this->convertErrorToException($code, pg_last_error($this->connection));
         }
         $data = [];
-        while ((($stopAfter === null) || ($stopAfter > 0)) && ($row = pg_fetch_row($result)) !== FALSE) {
+        while ((($stopAfter === null) || $stopAfter > 0) && ($row = pg_fetch_row($result)) !== FALSE) {
             if (is_array($row)) {
                 $processedRow = [];
                 for ($i = 0; $i < count($row); $i++) {

@@ -326,7 +326,7 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
             => throw new BadMethodCallException(message: "Unsupported method {$method}()")
         };
     }
-    public function asRow(): mixed
+    public function asRow(): ?array
     {
         return $this->commit(stopAfter: 1)[0] ?? null;
     }
@@ -343,7 +343,7 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
         };
         return $this->getPreparedStatement($escapedParametersEnumerator)->query;
     }
-    public function asTable(): mixed
+    public function asTable(): array
     {
         return $this->commit();
     }
@@ -354,7 +354,7 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
             default => ($this->commit(stopAfter: 1)[0][$index] ?? null)
         };
     }
-    public function commit(?int $stopAfter = null): mixed
+    public function commit(?int $stopAfter = null): array
     {
         $preparedStatement = $this->getPreparedStatement($this->adapter->enumerateParameters(...));
         HookManager::triggerHook(HookManager::BEFORE_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters]);
