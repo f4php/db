@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace F4\DB;
 
 use InvalidArgumentException;
+use F4\DB\Fragment;
 use F4\DB\FragmentCollectionInterface;
 use F4\DB\FragmentInterface;
 use F4\DB\PreparedStatement;
@@ -35,6 +36,12 @@ class FragmentCollection implements FragmentCollectionInterface, FragmentInterfa
     public function __construct(...$arguments)
     {
         $this->addExpression($arguments);
+    }
+    public function __clone() {
+        $this->fragments = array_map(
+            callback: fn(FragmentInterface $fragment): FragmentInterface => clone $fragment,
+            array: $this->fragments,
+        );
     }
     public function addExpression(mixed $expression): void
     {

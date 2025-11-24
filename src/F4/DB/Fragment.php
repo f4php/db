@@ -15,6 +15,7 @@ use function array_shift;
 use function count;
 use function implode;
 use function is_array;
+use function is_object;
 use function preg_quote;
 
 /**
@@ -44,6 +45,15 @@ class Fragment implements FragmentInterface
         if ($query !== null) {
             $this->setQuery(query: $query, parameters: $parameters);
         }
+    }
+    public function __clone() {
+        $this->parameters = array_map(
+            callback: fn(mixed $parameter): mixed => match(is_object($parameter)){
+                true => clone $parameter,
+                default => $parameter
+            },
+            array: $this->parameters,
+        );
     }
     protected static function getPlaceholderRegExp(): string
     {

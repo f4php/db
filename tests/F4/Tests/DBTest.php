@@ -286,4 +286,15 @@ final class DBTest extends TestCase
         $identifier1 = DB::escapeIdentifier('table"name');
         $this->assertSame('"table""name"', $identifier1);
     }
+    public function testSimpleCloning(): void
+    {
+        $from0 = DB::select('d')->from('e')->where(['f'=>3]);
+        $from1 = (clone $from0)->where(['c'=>1]);
+        $db1 = DB::select('a')->from(['({#::#}) AS "t1"' => $from1]);
+        $from2 = (clone $from0)->where(['d'=>2]);
+        $db2 = DB::select('a')->from(['({#::#}) AS "t1"' => $from2]);
+
+        $this->assertSame('SELECT "a" FROM (SELECT "d" FROM "e" WHERE "f" = 3 AND "c" = 1) AS "t1"', $db1->asSQL());
+        $this->assertSame('SELECT "a" FROM (SELECT "d" FROM "e" WHERE "f" = 3 AND "d" = 2) AS "t1"', $db2->asSQL());
+    }
 }
