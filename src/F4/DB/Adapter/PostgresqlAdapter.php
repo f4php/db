@@ -63,7 +63,9 @@ use function sprintf;
  */
 class PostgresqlAdapter implements AdapterInterface
 {
-    protected Connection $connection;
+    protected Connection $connection {
+        get => $this->connect(connectionString: $this->connectionString, connectionFlags: $this->connectionFlags);
+    }
     protected ?string $connectionString;
     protected int $connectionFlags;
 
@@ -80,10 +82,8 @@ class PostgresqlAdapter implements AdapterInterface
     }
     public function execute(PreparedStatement $statement, ?int $stopAfter = null): mixed
     {
-        if(!$this->connection) {
-            if (!$this->connection = $this->connect(connectionString: $this->connectionString, connectionFlags: $this->connectionFlags)) {
-                throw new ErrorException('Failed to connect to the database', 500);
-            }
+        if (!$this->connection) {
+            throw new ErrorException('Failed to connect to the database', 500);
         }
         $query = $statement->query;
         // native booleans are passed as empty strings by default, which requires a workaround
@@ -101,7 +101,7 @@ class PostgresqlAdapter implements AdapterInterface
             throw new Exception(message: pg_last_error($this->connection), code: 500);
         }
         $result = pg_get_result($this->connection);
-        if (!is_resource($result) && (!$result instanceof Result)) {
+        if ($result !== false && !is_resource($result) && (!$result instanceof Result)) {
             throw new Exception(message: pg_last_error($this->connection), code: 500);
         }
         if (($code = pg_result_error_field($result, PGSQL_DIAG_SQLSTATE)) !== null) {
@@ -239,6 +239,9 @@ class PostgresqlAdapter implements AdapterInterface
     }
     public function getEscapedValue(mixed $value): string
     {
+        if (!$this->connection) {
+            throw new ErrorException('Failed to connect to the database', 500);
+        }
         return match ($value === null) {
             true => 'NULL',
             default => match (is_bool($value)) {
@@ -258,6 +261,9 @@ class PostgresqlAdapter implements AdapterInterface
     }
     public function getEscapedIdentifier(mixed $value): string
     {
+        if (!$this->connection) {
+            throw new ErrorException('Failed to connect to the database', 500);
+        }
         return pg_escape_identifier($this->connection, (string) $value);
     }
 }
