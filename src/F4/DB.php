@@ -326,28 +326,9 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
             => throw new BadMethodCallException(message: "Unsupported method {$method}()")
         };
     }
-    public function commit(?int $stopAfter = null): mixed
-    {
-        $preparedStatement = $this->getPreparedStatement($this->adapter->enumerateParameters(...));
-        HookManager::triggerHook(HookManager::BEFORE_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters]);
-        $result = $this->adapter->execute(statement: $preparedStatement, stopAfter: $stopAfter);
-        HookManager::triggerHook(HookManager::AFTER_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters, 'result' => $result]);
-        return $result;
-    }
-    public function asTable(): mixed
-    {
-        return $this->commit();
-    }
     public function asRow(): mixed
     {
         return $this->commit(stopAfter: 1)[0] ?? null;
-    }
-    public function asValue(string|int $index = 0): mixed
-    {
-        return match (is_int($index)) {
-            true => array_values($this->commit(stopAfter: 1)[0] ?? [])[$index] ?? null,
-            default => ($this->commit(stopAfter: 1)[0][$index] ?? null)
-        };
     }
     public function asSQL(): string
     {
@@ -362,10 +343,34 @@ class DB extends FragmentCollection implements FragmentCollectionInterface, Frag
         };
         return $this->getPreparedStatement($escapedParametersEnumerator)->query;
     }
+    public function asTable(): mixed
+    {
+        return $this->commit();
+    }
+    public function asValue(string|int $index = 0): mixed
+    {
+        return match (is_int($index)) {
+            true => array_values($this->commit(stopAfter: 1)[0] ?? [])[$index] ?? null,
+            default => ($this->commit(stopAfter: 1)[0][$index] ?? null)
+        };
+    }
+    public function commit(?int $stopAfter = null): mixed
+    {
+        $preparedStatement = $this->getPreparedStatement($this->adapter->enumerateParameters(...));
+        HookManager::triggerHook(HookManager::BEFORE_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters]);
+        $result = $this->adapter->execute(statement: $preparedStatement, stopAfter: $stopAfter);
+        HookManager::triggerHook(HookManager::AFTER_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters, 'result' => $result]);
+        return $result;
+    }
     public static function escapeIdentifier(string $identifier): string
     {
         $instance = new self();
         return $instance->adapter->getEscapedIdentifier($identifier);
+    }
+    public function useAdapter(AdapterInterface $adapter): static
+    {
+        $this->adapter = $adapter;
+        return $this;
     }
     protected function resetAllFragmentCollectionsNames()
     {

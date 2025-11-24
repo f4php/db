@@ -19,4 +19,3 @@ interface FragmentCollectionInterface
     public function withName(string $name): static;
     public function withPrefix(string $prefix): static;
 }
-
