@@ -64,7 +64,7 @@ use function sprintf;
 class PostgresqlAdapter implements AdapterInterface
 {
     protected Connection $connection {
-        get => $this->connect(connectionString: $this->connectionString, connectionFlags: $this->connectionFlags);
+        get => $this->connection ?? ($this->connection=$this->connect(connectionString: $this->connectionString, connectionFlags: $this->connectionFlags));
     }
     protected ?string $connectionString;
     protected int $connectionFlags;
