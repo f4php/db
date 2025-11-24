@@ -104,7 +104,7 @@ class PostgresqlAdapter implements AdapterInterface
         if ($result !== false && !is_resource($result) && (!$result instanceof Result)) {
             throw new Exception(message: pg_last_error($this->connection), code: 500);
         }
-        if (($code = pg_result_error_field($result, PGSQL_DIAG_SQLSTATE)) !== null) {
+        if (($result !== false) && ($code = pg_result_error_field($result, PGSQL_DIAG_SQLSTATE)) !== null) {
             throw $this->convertErrorToException($code, pg_last_error($this->connection));
         }
         $data = [];
