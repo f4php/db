@@ -89,7 +89,8 @@ class DBTransaction
         }
         catch(Throwable $e) {
             $query = DB::raw('ROLLBACK');
-            return $this->adapter->execute(statement: $query->getPreparedStatement());
+            $this->adapter->execute(statement: $query->getPreparedStatement());
+            throw $e;
         }
     }
     protected function getQueries(): array
