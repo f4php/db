@@ -9,6 +9,7 @@ use BadMethodCallException;
 use F4\Config;
 use F4\DB;
 use F4\DB\Adapter\AdapterInterface;
+use Throwable;
 
 use function array_map;
 use function implode;
@@ -76,14 +77,20 @@ class DBTransaction
     }
     public function commit(): mixed
     {
-        return array_map(
-            callback: function ($query) {
-                $query->useAdapter($this->adapter);
-                $preparedStatement = $query->getPreparedStatement($this->adapter->enumerateParameters(...));
-                return $this->adapter->execute(statement: $preparedStatement);
-            },
-            array: $this->getQueries(),
-        );
+        try {
+            return array_map(
+                callback: function ($query) {
+                    $query->useAdapter($this->adapter);
+                    $preparedStatement = $query->getPreparedStatement($this->adapter->enumerateParameters(...));
+                    return $this->adapter->execute(statement: $preparedStatement);
+                },
+                array: $this->getQueries(),
+            );
+        }
+        catch(Throwable $e) {
+            $query = DB::raw('ROLLBACK');
+            return $this->adapter->execute(statement: $query->getPreparedStatement());
+        }
     }
     protected function getQueries(): array
     {

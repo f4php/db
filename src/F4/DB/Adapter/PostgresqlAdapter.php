@@ -33,7 +33,6 @@ use function is_array;
 use function is_bool;
 use function is_float;
 use function is_int;
-use function is_resource;
 use function is_scalar;
 use function json_decode;
 use function mb_substr;
@@ -48,6 +47,7 @@ use function pg_field_type;
 use function pg_last_error;
 use function pg_query;
 use function pg_result_error_field;
+use function pg_result_status;
 use function pg_send_query_params;
 use function pg_send_query;
 use function pg_set_client_encoding;
@@ -86,46 +86,58 @@ class PostgresqlAdapter implements AdapterInterface
             throw new ErrorException('Failed to connect to the database', 500);
         }
         $query = $statement->query;
-        // native booleans are passed as empty strings by default, which requires a workaround
-        $parameters = array_map(function ($parameter) {
-            return match (is_bool($parameter)) {
+        // PHP bools are cast to empty strings by default, which requires a workaround
+        $parameters = array_map(
+            callback: fn ($parameter): mixed => match (is_bool($parameter)) {
                 true => $parameter ? 'true' : 'false',
                 default => $parameter
-            };
-        }, $statement->parameters);
+            },
+            array: $statement->parameters
+        );
         if (
-            (count($parameters) && !pg_send_query_params($this->connection, $query, $parameters))
+            (count($parameters) && pg_send_query_params(connection: $this->connection, query: $query, params: $parameters) !== TRUE)
             ||
-            (!count($parameters) && !pg_send_query($this->connection, $query))
+            (!count($parameters) && pg_send_query(connection: $this->connection, query: $query) !== TRUE)
         ) {
             throw new Exception(message: pg_last_error($this->connection), code: 500);
         }
-        if(($result = pg_get_result($this->connection)) === FALSE) {
-            return [];
-        }
-        if (!is_resource($result) && (!$result instanceof Result)) {
-            throw new Exception(message: pg_last_error($this->connection), code: 500);
-        }
-        if (($code = pg_result_error_field($result, PGSQL_DIAG_SQLSTATE)) !== null) {
-            throw $this->convertErrorToException($code, pg_last_error($this->connection));
-        }
-        $data = [];
-        while ((($stopAfter === null) || $stopAfter > 0) && ($row = pg_fetch_row($result)) !== FALSE) {
-            if (is_array($row)) {
-                $processedRow = [];
-                for ($i = 0; $i < count($row); $i++) {
-                    $processedRow[pg_field_name($result, $i)] = $this->castType($row[$i], pg_field_type($result, $i));
-                }
-            } else {
-                $processedRow = $row;
+        $rows = [];
+        while(($result = pg_get_result($this->connection)) !== FALSE) {
+            switch(pg_result_status($result)) {
+                case PGSQL_BAD_RESPONSE:
+                case PGSQL_NONFATAL_ERROR:
+                case PGSQL_FATAL_ERROR:
+                    throw match($code = pg_result_error_field($result, PGSQL_DIAG_SQLSTATE)) {
+                        null, false => new Exception(message: "Undefined database error", code: 500),
+                        default => $this->convertErrorToException(code: $code, message: pg_last_error($this->connection)),
+                    };
+                case PGSQL_TUPLES_OK:
+                    while ((($stopAfter === null) || $stopAfter > 0) && ($row = pg_fetch_row($result)) !== FALSE) {
+                        if (is_array($row)) {
+                            $processedRow = [];
+                            for ($i = 0; $i < count($row); $i++) {
+                                $processedRow[pg_field_name($result, $i)] = $this->castType($row[$i], pg_field_type($result, $i));
+                            }
+                        } else {
+                            $processedRow = $row;
+                        }
+                        $rows[] = $processedRow;
+                        if (($stopAfter !== null) && count($rows) >= $stopAfter) {
+                            break;
+                        }
+                    };
+                    break;
+                case PGSQL_EMPTY_QUERY:
+                case PGSQL_COMMAND_OK:
+                case PGSQL_TUPLES_CHUNK:
+                case PGSQL_COPY_OUT:
+                case PGSQL_COPY_IN:
+                default:
+                    break;
             }
-            $data[] = $processedRow;
-            if (($stopAfter !== null) && (count($data) >= $stopAfter)) {
-                break;
-            }
+            pg_free_result($result);
         }
-        pg_free_result($result);
-        return $data;
+        return $rows;
     }
     public function enumerateParameters(int $index): string
     {
