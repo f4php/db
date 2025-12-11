@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "4ac5fa182b15fb60004c6ff668e9463c",
+    "content-hash": "f32332be110892c9eefb2060331dacf3",
     "packages": [
         {
             "name": "composer/pcre",
@@ -87,16 +87,16 @@
         },
         {
             "name": "f4php/hookmanager",
-            "version": "v0.0.1",
+            "version": "v0.0.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/f4php/hookmanager.git",
-                "reference": "6f29c33cd1e7f0fc4c8509c58b413c3caed26cab"
+                "reference": "27e2ace876cb58794ba5cbcc708298537953d210"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/f4php/hookmanager/zipball/6f29c33cd1e7f0fc4c8509c58b413c3caed26cab",
-                "reference": "6f29c33cd1e7f0fc4c8509c58b413c3caed26cab",
+                "url": "https://api.github.com/repos/f4php/hookmanager/zipball/27e2ace876cb58794ba5cbcc708298537953d210",
+                "reference": "27e2ace876cb58794ba5cbcc708298537953d210",
                 "shasum": ""
             },
             "require": {
@@ -123,7 +123,7 @@
                     "email": "dennis@kreminsky.com"
                 }
             ],
-            "description": "HookManager is internal hook management SDK for F4, a lightweight web application framework",
+            "description": "HookManager is internal hooks core package for F4, a lightweight web development framework",
             "keywords": [
                 "f4",
                 "framework",
@@ -131,9 +131,9 @@
             ],
             "support": {
                 "issues": "https://github.com/f4php/hookmanager/issues",
-                "source": "https://github.com/f4php/hookmanager/tree/v0.0.1"
+                "source": "https://github.com/f4php/hookmanager/tree/v0.0.2"
             },
-            "time": "2025-07-05T11:40:01+00:00"
+            "time": "2025-12-11T20:16:04+00:00"
         }
     ],
     "packages-dev": [

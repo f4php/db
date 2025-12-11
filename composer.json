@@ -33,7 +33,7 @@
         "ext-pgsql": "*",
         "php": "^8.4.1",
         "composer/pcre": "^3.3",
-        "f4php/hookmanager": "^0.0.1"
+        "f4php/hookmanager": "^0.0.2"
     },
     "require-dev": {
         "phpunit/phpunit": "^12",
