@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace F4\DB;
 
+use F4\DB\FragmentCollection;
+use F4\DB\FragmentCollectionInterface;
+use F4\DB\FragmentInterface;
+
 use function array_filter;
 use function array_map;
 use function implode;
@@ -17,12 +21,12 @@ use function sprintf;
  * @author Dennis Kreminsky <dennis@kreminsky.com>
  * 
  */
-class Parenthesize extends FragmentCollection
+class Parenthesize extends FragmentCollection implements FragmentCollectionInterface, FragmentInterface
 {
     public function __construct(...$arguments)
     {
         array_map(
-            callback: fn ($argument) => $this->append($argument),
+            callback: $this->append(...),
             array: $arguments,
         );
     }

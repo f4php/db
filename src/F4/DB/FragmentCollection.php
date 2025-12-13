@@ -37,7 +37,8 @@ class FragmentCollection implements FragmentCollectionInterface, FragmentInterfa
     {
         $this->addExpression($arguments);
     }
-    public function __clone() {
+    public function __clone()
+    {
         $this->fragments = array_map(
             callback: fn(FragmentInterface $fragment): FragmentInterface => clone $fragment,
             array: $this->fragments,
@@ -69,9 +70,12 @@ class FragmentCollection implements FragmentCollectionInterface, FragmentInterfa
     }
     public function findFragmentCollectionByName(string $name): ?FragmentCollectionInterface
     {
-        $fragment = array_find($this->getFragments(), function (FragmentInterface $fragment) use ($name) {
-            return ($fragment instanceof FragmentCollection) && ($fragment->getName() === $name);
-        });
+        $fragment = array_find(
+            array: $this->getFragments(),
+            callback: function (FragmentInterface $fragment) use ($name) {
+                return ($fragment instanceof FragmentCollection) && ($fragment->getName() === $name);
+            }
+        );
         return $fragment;
     }
     public function getFragments(): array
@@ -84,9 +88,11 @@ class FragmentCollection implements FragmentCollectionInterface, FragmentInterfa
     }
     public function getParameters(): array
     {
-        return array_reduce($this->fragments, function (array $result, FragmentInterface $fragment): array {
-            return [...$result, ...$fragment->getParameters()];
-        }, []);
+        return array_reduce(
+            array: $this->fragments,
+            callback: fn(array $result, FragmentInterface $fragment): array => [...$result, ...$fragment->getParameters()],
+            initial: [],
+        );
     }
     public function getPreparedStatement(?callable $enumeratorFunction = null): PreparedStatement
     {
@@ -98,19 +104,22 @@ class FragmentCollection implements FragmentCollectionInterface, FragmentInterfa
     }
     public function getQuery(): string
     {
-        $query = implode(static::GLUE, array_filter(
-            array_map(
-                fn (FragmentInterface $fragment): string => $fragment->getQuery(), 
-                $this->fragments
+        $query = implode(
+            separator: static::GLUE,
+            array: array_filter(
+                array: array_map(
+                    callback: fn(FragmentInterface $fragment): string => $fragment->getQuery(),
+                    array: $this->fragments,
+                ),
+                callback: fn($query) => $query !== ''
             ),
-            fn($query) => $query !== '')
         );
         return match ($query === '') {
             true => '',
             default => match ($this->prefix) {
-                null => $query,
-                default => "{$this->prefix} {$query}",
-            }
+                    null => $query,
+                    default => "{$this->prefix} {$query}",
+                }
         };
     }
     public function resetName(): void

@@ -28,19 +28,22 @@ class NoneConditionCollection extends ConditionCollection
     protected const string GLUE = ' OR ';
     public function getQuery(): string
     {
-        $query = implode(static::GLUE, array_filter(
-            array: array_map(
-                callback: fn (FragmentInterface $fragment): string => $fragment->getQuery(),
-                array: $this->fragments
+        $query = implode(
+            separator: static::GLUE,
+            array: array_filter(
+                array: array_map(
+                    callback: fn(FragmentInterface $fragment): string => $fragment->getQuery(),
+                    array: $this->fragments,
+                ),
+                callback: fn($query) => $query !== ''
             ),
-            callback: fn($query) => $query !== '')
         );
         return match ($query === '') {
             true => '',
             default => match ($this->prefix) {
-                null => sprintf('NOT (%s)', Preg::replace('/^\((.*)\)$/', '$1', $query)),
-                default => sprintf('%s NOT(%s)', $this->prefix, $query)
-            }
+                    null => sprintf('NOT (%s)', Preg::replace('/^\((.*)\)$/', '$1', $query)),
+                    default => sprintf('%s NOT (%s)', $this->prefix, $query)
+                }
         };
     }
 
