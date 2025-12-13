@@ -57,7 +57,7 @@ class DBTransaction
             ...array_map(
                 // make sure all added queries implement QueryBuilderInterface and have the same adapter instance 
                 // (all transaction queries are required to use the same database connection)
-                callback: fn(QueryBuilderInterface $query): QueryBuilderInterface => $query->useAdapter($this->adapter),
+                callback: fn(QueryBuilderInterface $query): QueryBuilderInterface => (clone $query)->useAdapter($this->adapter),
                 array: match (is_array($query)) {
                     true => $query,
                     default => [$query],
