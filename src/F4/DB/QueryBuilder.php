@@ -49,8 +49,8 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     protected function resetAllFragmentCollectionsNames()
     {
         array_map(
-            callback: function (FragmentInterface $fragment): void {
-                if ($fragment instanceof FragmentCollection) {
+            callback: function (FragmentInterface|FragmentCollectionInterface $fragment): void {
+                if ($fragment instanceof FragmentCollectionInterface) {
                     $fragment->resetName();
                 }
             },
