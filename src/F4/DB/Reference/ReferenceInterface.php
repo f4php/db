@@ -14,6 +14,7 @@ namespace F4\DB\Reference;
  */
 interface ReferenceInterface
 {
-    public ?string $delimitedIdentifier { get;
+    public ?string $delimitedIdentifier {
+        get;
     }
 }

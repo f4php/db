@@ -6,6 +6,7 @@ namespace F4\DB\Reference;
 
 use InvalidArgumentException;
 use F4\DB;
+use F4\DB\Reference\ReferenceInterface;
 use F4\DB\Reference\SimpleReference;
 
 use function sprintf;
@@ -18,10 +19,10 @@ use function sprintf;
  * @author Dennis Kreminsky <dennis@kreminsky.com>
  * 
  */
-class TableReferenceWithAlias extends SimpleReference
+class TableReferenceWithAlias extends SimpleReference implements ReferenceInterface
 {
     public const string IDENTIFIER_PATTERN = '(?<table>[a-zA-Z_][a-zA-Z0-9_]{0,62})(\s+(?<alias>[a-zA-Z_][a-zA-Z0-9_]{0,62}))?';
-    protected function extractDelimitedIdentifier($matches): string
+    protected function extractDelimitedIdentifier(array $matches): string
     {
         if (empty($matches['table'])) {
             throw new InvalidArgumentException('Cannot locate table identifier');

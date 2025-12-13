@@ -9,6 +9,7 @@ use InvalidArgumentException;
 use F4\DB;
 use F4\DB\Reference\ReferenceInterface;
 
+use function mb_trim;
 use function sprintf;
 
 /**
@@ -39,12 +40,12 @@ class SimpleReference implements ReferenceInterface
             default => null
         };
     }
-    protected function extractDelimitedIdentifier($matches): string
+    protected function extractDelimitedIdentifier(array $matches): string
     {
-        if (empty($matches['identifier'])) {
-            throw new InvalidArgumentException('Cannot locate identifier');
-        }
-        return sprintf('%s', DB::escapeIdentifier($matches['identifier']));
+        return match (empty($matches['identifier'])) {
+            true => throw new InvalidArgumentException('Cannot locate identifier'),
+            default => sprintf('%s', DB::escapeIdentifier($matches['identifier'])),
+        };
     }
 }
 
