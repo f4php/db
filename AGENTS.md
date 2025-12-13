@@ -369,6 +369,11 @@ Raw expressions (numeric array keys or expressions with custom placeholders) byp
    $admin = $base->where(['role' => 'admin'])->asTable();  // Mutates $base!
    $user = $base->where(['role' => 'user'])->asTable();     // Has BOTH conditions!
 
+   // Right: Cloning the base
+   $base = DB::select()->from('users');
+   $admin = (clone $base)->where(['role' => 'admin'])->asTable();
+   $user = (clone $base)->where(['role' => 'user'])->asTable();
+
    // RIGHT: Create fresh instances
    $admin = DB::select()->from('users')->where(['role' => 'admin'])->asTable();
    $user = DB::select()->from('users')->where(['role' => 'user'])->asTable();

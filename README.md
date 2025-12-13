@@ -471,8 +471,13 @@ Builder instances accumulate mutations. Don't reuse them:
 ```php
 // ❌ WRONG - mutations accumulate
 $base = DB::select()->from('user');
-$admins = $base->where(['role' => 'admin'])->asTable();  // Mutates $base!
-$regularUsers = $base->where(['role' => 'user'])->asTable();    // Has BOTH conditions!
+$admins = $base->where(['role' => 'admin'])->asTable();       // Mutates $base!
+$regularUsers = $base->where(['role' => 'user'])->asTable();  // Has BOTH conditions!
+
+// ✅ RIGHT - clone the base
+$base = DB::select()->from('user');
+$admins = (clone $base)->where(['role' => 'admin'])->asTable();
+$regularUsers = (clone $base)->where(['role' => 'user'])->asTable();
 
 // ✅ RIGHT - create fresh instances
 $admins = DB::select()->from('user')->where(['role' => 'admin'])->asTable();
