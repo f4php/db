@@ -2,6 +2,66 @@
 
 **DB** is a database query builder and a core package of [F4](https://github.com/f4php/f4), a lightweight web development framework.
 
+## Table of Contents
+
+- [Overview](#overview)
+  - [Table of Contents](#table-of-contents)
+  - [Installation](#installation)
+  - [Quick Start](#quick-start)
+  - [Configuration](#configuration)
+  - [Key Concepts](#key-concepts)
+  - [Placeholders](#placeholders)
+  - [WHERE Clauses](#where-clauses)
+  - [Common Operations](#common-operations)
+    - [INSERT with Values](#insert-with-values)
+    - [UPDATE Statement](#update-statement)
+    - [DELETE Statement](#delete-statement)
+    - [UPSERT (INSERT with ON CONFLICT)](#upsert-insert-with-on-conflict)
+    - [JOIN Operations](#join-operations)
+    - [Common Table Expressions (CTEs)](#common-table-expressions-ctes)
+    - [Subqueries with `{#::#}` Placeholder](#subqueries-with--placeholder)
+  - [Getting Results](#getting-results)
+  - [Data Types](#data-types)
+  - [Usage Examples](#usage-examples)
+    - [Simple Query](#simple-query)
+    - [Slightly More Complex Query](#slightly-more-complex-query)
+  - [Best Practices](#best-practices)
+  - [Common Pitfalls](#common-pitfalls)
+    - [Builder Instances Are Mutable](#builder-instances-are-mutable)
+    - [Match Placeholder Types to Values](#match-placeholder-types-to-values)
+    - [Don't Manually Quote Auto-Quoted Identifiers](#dont-manually-quote-auto-quoted-identifiers)
+    - [Don't Forget Execution Methods](#dont-forget-execution-methods)
+
+## Installation
+
+```bash
+composer require f4php/db
+```
+
+## Quick Start
+
+```php
+use F4\DB;
+
+// Simple query
+$users = DB::select(['id', 'name', 'email'])
+    ->from('user')
+    ->where(['active' => true])
+    ->asTable();
+
+// Single row
+$user = DB::select()
+    ->from('user')
+    ->where(['id' => 5])
+    ->asRow();
+
+// Single value
+$count = DB::select('COUNT(*)')
+    ->from('user')
+    ->where(['active' => true])
+    ->asValue();
+```
+
 ## Configuration
 
 DB relies on the following constants defined in your environment configuration:
@@ -114,27 +174,231 @@ Three placeholder types are supported:
 
 `{#,...#}` for an array
 
-`{#::#}` for a DB object instance
+`{#::#}` for a DB Query Builder object instance
 
 Refer to the Usage Examples section below for practical demonstration.
+
+## WHERE Clauses
+
+DB provides intuitive WHERE clause construction using associative arrays:
+
+```php
+// Simple equality
+DB::select()->from('user')->where(['name' => 'John', 'active' => true])
+// WHERE "name" = $1 AND "active" = $2
+
+// IN clause with arrays
+DB::select()->from('user')->where(['status' => ['active', 'pending']])
+// WHERE "status" IN ($1, $2)
+
+// NULL checks
+DB::select()->from('user')->where(['deleted_at' => null])
+// WHERE "deleted_at" IS NULL
+
+// Custom expressions with placeholders
+DB::select()->from('user')->where(['"age" >= {#}' => 18])
+// WHERE "age" >= $1
+
+// OR conditions
+use F4\DB\AnyConditionCollection as any;
+
+DB::select()->from('user')->where(any::of(['role' => 'admin', 'role' => 'moderator']))
+// WHERE ("role" = $1 OR "role" = $2)
+
+// Nested conditions
+use F4\DB\ConditionCollection as all;
+
+DB::select()->from('user')->where([
+    'active' => true,
+    any::of([
+        'role' => 'admin',
+        all::of(['"age" >= {#}' => 18, 'verified' => true])
+    ])
+])
+// WHERE "active" = $1 AND ("role" = $2 OR ("age" >= $3 AND "verified" = $4))
+
+// NOT conditions
+use F4\DB\NoneConditionCollection as none;
+
+DB::select()->from('user')->where(none::of(['banned' => true, 'deleted' => true]))
+// WHERE NOT ("banned" = $1 OR "deleted" = $2)
+```
+
+## Common Operations
+
+### INSERT with Values
+
+```php
+DB::insert()
+    ->into('user')
+    ->values([
+        'name' => 'John Doe',
+        'email' => 'john@example.com',
+        'created_at' => 'NOW()'
+    ])
+    ->returning('id')
+    ->asValue();
+```
+
+### UPDATE Statement
+
+```php
+DB::update('user')
+    ->set(['active' => false, 'updated_at' => 'NOW()'])
+    ->where(['id' => 123])
+    ->commit();
+```
+
+### DELETE Statement
+
+```php
+DB::delete()
+    ->from('user')
+    ->where(['active' => false, '"last_login" < {#}' => '2023-01-01'])
+    ->commit();
+```
+
+### UPSERT (INSERT with ON CONFLICT)
+
+```php
+DB::insert()
+    ->into('settings')
+    ->values(['key' => 'theme', 'value' => 'dark'])
+    ->onConflict('key')
+    ->doUpdateSet(['value' => 'dark', 'updated_at' => 'NOW()'])
+    ->commit();
+```
+
+### JOIN Operations
+
+```php
+// INNER JOIN with ON clause
+DB::select(['u.name', 'o.total'])
+    ->from('user u')
+    ->innerJoin('order o')
+    ->on(['"u"."id" = "o"."user_id"'])
+    ->asTable();
+
+// Multiple JOINs
+DB::select()
+    ->from('order o')
+    ->join('user u')->on(['"o"."user_id" = "u"."id"'])
+    ->leftJoin('payment p')->on(['"o"."id" = "p"."order_id"'])
+    ->where(['o.status' => 'completed'])
+    ->asTable();
+
+// USING clause for natural joins
+DB::select()
+    ->from('user u')
+    ->join('profile p')
+    ->using('user_id')
+    ->asTable();
+```
+
+### Common Table Expressions (CTEs)
+
+```php
+// Simple CTE
+DB::with(['active_user' => DB::select()->from('user')->where(['active' => true])])
+    ->select()
+    ->from('active_user')
+    ->where(['"created_at" > {#}' => '2024-01-01'])
+    ->asTable();
+
+// Multiple CTEs
+DB::with([
+    'active_user' => DB::select()->from('user')->where(['active' => true]),
+    'recent_order' => DB::select()->from('order')->where(['"created_at" > {#}' => '2024-01-01'])
+])
+    ->select(['u.*', 'o.total'])
+    ->from('active_user u')
+    ->join('recent_order o')->on(['"u"."id" = "o"."user_id"'])
+    ->asTable();
+
+// Recursive CTE (for hierarchical data)
+DB::withRecursive([
+    'org_tree' => DB::select(['id', 'name', 'parent_id', '1 AS "level"'])
+        ->from('department')
+        ->where(['parent_id' => null])
+        ->union()
+        ->select(['d.id', 'd.name', 'd.parent_id', '"t"."level" + 1'])
+        ->from('department d')
+        ->join('org_tree t')->on(['"d"."parent_id" = "t"."id"'])
+])
+    ->select()
+    ->from('org_tree')
+    ->orderBy('level', 'name')
+    ->asTable();
+```
+
+### Subqueries with `{#::#}` Placeholder
+
+```php
+// Subquery in SELECT clause
+DB::select([
+    'u.*',
+    'order_count' => DB::select('COUNT(*)')
+        ->from('order o')
+        ->where(['"o"."user_id" = "u"."id"'])
+])
+    ->from('user u')
+    ->asTable();
+// SELECT "u".*, (SELECT COUNT(*) FROM "order" AS "o" WHERE "o"."user_id" = "u"."id") AS "order_count" FROM "user" AS "u"
+
+// Subquery in WHERE clause
+DB::select()
+    ->from('user')
+    ->where([
+        'id' => DB::select('user_id')
+            ->from('order')
+            ->where(['status' => 'completed'])
+            ->limit(1)
+    ])
+    ->asTable();
+// WHERE "id" = (SELECT "user_id" FROM "order" WHERE "status" = $1 LIMIT 1)
+
+// Subquery in FROM clause (derived table)
+DB::select(['summary.*'])
+    ->from([
+        'summary' => DB::select(['user_id', 'COUNT(*) AS "total"'])
+            ->from('order')
+            ->groupBy('user_id')
+    ])
+    ->where(['"total" > {#}' => 10])
+    ->asTable();
+// FROM (SELECT "user_id", COUNT(*) AS "total" FROM "order" GROUP BY ("user_id")) AS "summary"
+
+// Complex subquery with LATERAL JOIN
+DB::select(['"user".*', '"latest_order"."created_at" AS "last_order_date"'])
+    ->from('user')
+    ->leftJoinLateral([
+        '({#::#}) AS "latest_order"' => DB::select('created_at')
+            ->from('order')
+            ->where(['"user_id" = "user"."id"'])
+            ->orderBy('"created_at" DESC')
+            ->limit(1)
+    ])
+    ->on('true')
+    ->asTable();
+```
 
 ## Getting Results
 
 After building a query, the following tail methods are available for fetching results:
 
-`$db->asTable()` to fetch all rows
+`$query->asTable()` to fetch all rows
 
-`$db->commit()` same as `asTable()`
+`$query->commit()` same as `asTable()`
 
-`$db->asRow()` to fetch one row
+`$query->asRow()` to fetch one row
 
-`$db->asValue()` to fetch scalar value
+`$query->asValue($index)` to fetch scalar value (by numeric index or column name)
 
-`$db->asSQL()` to get raw SQL statement without bound parameters
+`$query->asSQL()` to get SQL with values escaped (for debugging - **not for execution**)
 
-`$db->getPreparedStatement()->query` same as `asSQL()`
+`$query->getPreparedStatement()->query` to get SQL with parameter placeholders as supported by the database server ($1, $2, etc.)
 
-`$db->getPreparedStatement()->parameters` returns an array of statement-bound parameters
+`$query->getPreparedStatement()->parameters` to get array of bound parameters
 
 ## Data Types
 
@@ -238,4 +502,76 @@ $rows = DB::with([
         '"status" IN ({#,...#})' => $statusFilter,
     )
     ->asTable();
+```
+
+## Best Practices
+
+- **Always use placeholders for user input** - Never concatenate values into SQL strings to prevent SQL injection
+- **Use `asRow()` instead of `asTable()[0]`** when fetching a single row - It's more efficient and stops after finding one result
+- **Use `asValue()` for single values** like `COUNT(*)`, `MAX(id)`, or `SUM(amount)` instead of fetching a full row
+- **Prefer static methods for new queries** - Use `DB::select()` to start a new query chain, instance methods for chaining
+- **Don't reuse builder instances** - Each query should use a fresh instance to avoid mutations accumulating
+
+## Common Pitfalls
+
+### Builder Instances Are Mutable
+
+Builder instances accumulate mutations. Don't reuse them:
+
+```php
+// ❌ WRONG - mutations accumulate
+$base = DB::select()->from('user');
+$admins = $base->where(['role' => 'admin'])->asTable();  // Mutates $base!
+$regularUsers = $base->where(['role' => 'user'])->asTable();    // Has BOTH conditions!
+
+// ✅ RIGHT - create fresh instances
+$admins = DB::select()->from('user')->where(['role' => 'admin'])->asTable();
+$regularUsers = DB::select()->from('user')->where(['role' => 'user'])->asTable();
+```
+
+### Match Placeholder Types to Values
+
+Use the correct placeholder for each value type:
+
+```php
+// ❌ WRONG - scalar placeholder with array value
+where(['"status" IN {#}' => ['a', 'b']])  // Error!
+
+// ✅ RIGHT - array placeholder with array value
+where(['"status" IN ({#,...#})' => ['a', 'b']])
+
+// ❌ WRONG - array placeholder with scalar value
+where(['"name" = ({#,...#})' => 'John'])  // Error!
+
+// ✅ RIGHT - scalar placeholder with scalar value
+where(['"name" = {#}' => 'John'])
+```
+
+### Don't Manually Quote Auto-Quoted Identifiers
+
+When using the associative array shorthand, identifiers are quoted automatically:
+
+```php
+// ❌ AVOID - missing double quoting for identifiers
+where(['name = {#}' => 'John'])  // Produces unquoted: name = $1
+
+// ✅ RIGHT - let DB quote it
+where(['name' => 'John'])  // Produces: "name" = $1
+
+// ✅ ALSO RIGHT - use quotes in custom expressions
+where(['"age" > {#}' => 18])  // Custom expression, you control quoting
+```
+
+### Don't Forget Execution Methods
+
+Building a query doesn't execute it:
+
+```php
+// ❌ WRONG - no execution
+$query = DB::select()->from('user');  // Just builds the query, doesn't run it
+
+// ✅ RIGHT - call an execution method
+$users = DB::select()->from('user')->asTable();      // Execute and fetch all
+$user = DB::select()->from('user')->asRow();         // Execute and fetch one
+$count = DB::select('COUNT(*)')->from('user')->asValue();  // Execute and fetch value
 ```
