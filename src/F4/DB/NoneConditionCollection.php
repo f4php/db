@@ -9,6 +9,11 @@ use F4\DB\ConditionCollection;
 use F4\DB\FragmentInterface;
 use F4\DB\StaticOfMethodTrait;
 
+use function array_filter;
+use function array_map;
+use function implode;
+use function sprintf;
+
 /**
  * 
  * AnyConditionCollection is an abstraction of sql expressions allowed inside a "WHERE" part of a statement but with OR as a glue

@@ -17,6 +17,7 @@ use function implode;
 use function is_array;
 use function is_object;
 use function preg_quote;
+use function sprintf;
 
 /**
  * 
@@ -109,9 +110,7 @@ class Fragment implements FragmentInterface
          * Other databases or drivers may use a different convention for prepared statement parameters,
          * in those situations $enumeratorCallback could be supplied to provide an alternative
          */
-        $enumeratorCallback ??= function (int $index): string {
-            return sprintf('$%d', $index);
-        };
+        $enumeratorCallback ??= fn (int $index): string => sprintf('$%d', $index);
         [$query, $parameters] = $this->unpackComplexPlaceholders(query: $this->query, parameters: $this->parameters);
         $index = 1;
         $query = Preg::replaceCallback("/(" . preg_quote(self::SINGLE_PARAMETER_PLACEHOLDER, '/') . ")/u", function () use (&$index, $enumeratorCallback) {
@@ -125,7 +124,7 @@ class Fragment implements FragmentInterface
             true => '',
             default => match ($this->prefix) {
                 null => $this->query,
-                default => sprintf('%s %s', $this->prefix, $this->query)
+                default => "{$this->prefix} {$this->query}",
             }
         };
     }

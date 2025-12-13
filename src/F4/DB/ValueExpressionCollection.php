@@ -46,7 +46,7 @@ class ValueExpressionCollection extends FragmentCollection
         } elseif ($expression instanceof FragmentInterface) {
             $this->append($expression);
         } else {
-            $this->append(new Fragment('{#}', [$expression]));
+            $this->append(new Fragment(Fragment::SINGLE_PARAMETER_PLACEHOLDER, [$expression]));
         }
     }
 }

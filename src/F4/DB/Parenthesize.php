@@ -21,18 +21,22 @@ class Parenthesize extends FragmentCollection
 {
     public function __construct(...$arguments)
     {
-        array_map(function ($argument): void {
-            $this->append($argument);
-        }, $arguments);
+        array_map(
+            callback: fn ($argument) => $this->append($argument),
+            array: $arguments,
+        );
     }
     public function getQuery(): string
     {
-        $query = implode(static::GLUE, array_filter(
-            array_map(
-                fn (FragmentInterface $fragment): string => $fragment->getQuery(), 
-                $this->fragments
+        $query = implode(
+            separator: static::GLUE,
+            array: array_filter(
+                array: array_map(
+                    callback: fn(FragmentInterface $fragment): string => $fragment->getQuery(),
+                    array: $this->fragments,
+                ),
+                callback: fn($query) => $query !== ''
             ),
-            fn($query) => $query !== '')
         );
         return match ($query === '') {
             true => '',

@@ -8,8 +8,11 @@ use InvalidArgumentException;
 use F4\DB\Reference\SimpleReference;
 
 use function is_array;
+use function is_numeric;
 use function is_scalar;
 use function mb_strtoupper;
+use function mb_trim;
+use function sprintf;
 
 /**
  * 
@@ -34,7 +37,7 @@ class OrderCollection extends FragmentCollection
                 if (is_numeric($key)) {
                     $this->addExpression($value);
                 } elseif (is_scalar($value) && ((mb_trim(mb_strtoupper($value)) === 'ASC') || (mb_trim(mb_strtoupper($value)) === 'DESC'))) {
-                    $query = match ($quoted = (new SimpleReference($key))->delimitedIdentifier) {
+                    $query = match ($quoted = new SimpleReference($key)->delimitedIdentifier) {
                         null => sprintf('%s %s', $key, mb_trim(mb_strtoupper($value))),
                         default => sprintf('%s %s', $quoted, mb_trim(mb_strtoupper($value)))
                     };

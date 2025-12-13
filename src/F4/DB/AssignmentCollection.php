@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace F4\DB;
 
+use F4\DB\Fragment;
+use F4\DB\FragmentInterface;
 use F4\DB\Reference\ColumnReference;
 use InvalidArgumentException;
 
+use function count;
 use function is_array;
 use function is_numeric;
 use function is_scalar;
+use function sprintf;
 
 /**
  * 
@@ -34,9 +38,9 @@ class AssignmentCollection extends FragmentCollection
                     $this->addExpression($value);
                 } else {
                     if (is_array($value)) {
-                        $query = match ($quoted = (new ColumnReference($key))->delimitedIdentifier) {
+                        $query = match ($quoted = new ColumnReference($key)->delimitedIdentifier) {
                             null => $key,
-                            default => sprintf('%s = ARRAY [{#,...#}]', $quoted)
+                            default => sprintf('%s = ARRAY [%s]', $quoted, Fragment::COMMA_PARAMETER_PLACEHOLDER)
                         };
                         $value = match(count(Fragment::extractPlaceholders($query)) > 1) {
                             true => $value,
@@ -44,15 +48,15 @@ class AssignmentCollection extends FragmentCollection
                         };
                         $this->append(new Fragment($query, $value));
                     } else if ($value instanceof FragmentInterface) {
-                        $query = match ($quoted = (new ColumnReference($key))->delimitedIdentifier) {
+                        $query = match ($quoted = new ColumnReference($key)->delimitedIdentifier) {
                             null => $key,
-                            default => sprintf('%s = ({#::#})', $quoted)
+                            default => sprintf('%s = (%s)', $quoted, Fragment::SUBQUERY_PARAMETER_PLACEHOLDER)
                         };
                         $this->append(new Fragment($query, [$value]));
                     } else if ($value === null || is_scalar($value)) {
-                        $query = match ($quoted = (new ColumnReference($key))->delimitedIdentifier) {
+                        $query = match ($quoted = new ColumnReference($key)->delimitedIdentifier) {
                             null => $key,
-                            default => sprintf('%s = {#}', $quoted)
+                            default => sprintf('%s = %s', $quoted, Fragment::SINGLE_PARAMETER_PLACEHOLDER)
                         };
                         $this->append(new Fragment($query, [$value]));
                     } else {

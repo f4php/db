@@ -14,6 +14,7 @@ use InvalidArgumentException;
 
 use function array_filter;
 use function array_map;
+use function count;
 use function implode;
 use function is_array;
 use function is_numeric;
@@ -64,9 +65,9 @@ class ConditionCollection extends FragmentCollection
                     $this->addExpression($value);
                 } else {
                     if (is_array($value)) {
-                        $query = match ($quoted = (new ColumnReference($key))->delimitedIdentifier) {
+                        $query = match ($quoted = new ColumnReference($key)->delimitedIdentifier) {
                             null => $key,
-                            default => sprintf('%s IN ({#,...#})', $quoted)
+                            default => sprintf('%s IN (%s)', $quoted, Fragment::COMMA_PARAMETER_PLACEHOLDER)
                         };
                         $value = match(count(Fragment::extractPlaceholders($query)) > 1) {
                             true => $value,
@@ -74,17 +75,17 @@ class ConditionCollection extends FragmentCollection
                         };
                         $this->append(new Fragment($query, $value));
                     } elseif ($value instanceof FragmentInterface) {
-                        $query = match ($quoted = (new ColumnReference($key))->delimitedIdentifier) {
+                        $query = match ($quoted = new ColumnReference($key)->delimitedIdentifier) {
                             null => $key,
                             /**
                              * By default, we assume that subquery returns a single value
                              * If not, a "field" IN ({#::#}) is still supported in custom query mode
                              */
-                            default => sprintf('%s = ({#::#})', $quoted)
+                            default => sprintf('%s = (%s)', $quoted, Fragment::SUBQUERY_PARAMETER_PLACEHOLDER)
                         };
                         $this->append(new Fragment($query, [$value]));
                     } else if ($value === null) {
-                        $query = match ($quoted = (new ColumnReference($key))->delimitedIdentifier) {
+                        $query = match ($quoted = new ColumnReference($key)->delimitedIdentifier) {
                             null => $key,
                             default => sprintf('%s IS NULL', $quoted)
                         };
@@ -97,9 +98,9 @@ class ConditionCollection extends FragmentCollection
                             default => $this->append(new Fragment($query))
                         };
                     } else if (is_scalar($value)) {
-                        $query = match ($quoted = (new ColumnReference($key))->delimitedIdentifier) {
+                        $query = match ($quoted = new ColumnReference($key)->delimitedIdentifier) {
                             null => $key,
-                            default => sprintf('%s = {#}', $quoted)
+                            default => sprintf('%s = %s', $quoted, Fragment::SINGLE_PARAMETER_PLACEHOLDER)
                         };
                         $this->append(new Fragment($query, [$value]));
                     } else {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace F4\DB;
 
+use F4\DB\Fragment;
 use F4\DB\Reference\SimpleReference;
 use F4\DB\Reference\ColumnReferenceWithAlias;
 use InvalidArgumentException;
@@ -37,9 +38,9 @@ class SelectExpressionCollection extends FragmentCollection
                     $this->addExpression($value);
                 } else {
                     if (is_array($value)) {
-                        $query = match ($quoted = (new SimpleReference($key))->delimitedIdentifier) {
+                        $query = match ($quoted = new SimpleReference($key)->delimitedIdentifier) {
                             null => $key,
-                            default => sprintf('({#,...#}) AS %s', $quoted)
+                            default => sprintf('(%s) AS %s', Fragment::COMMA_PARAMETER_PLACEHOLDER, $quoted)
                         };
                         $value = match(count(Fragment::extractPlaceholders($query)) > 1) {
                             true => $value,
@@ -47,15 +48,15 @@ class SelectExpressionCollection extends FragmentCollection
                         };
                         $this->append(new Fragment($query, $value));
                     } else if ($value instanceof FragmentInterface) {
-                        $query = match ($quoted = (new SimpleReference($key))->delimitedIdentifier) {
+                        $query = match ($quoted = new SimpleReference($key)->delimitedIdentifier) {
                             null => $key,
-                            default => sprintf('({#::#}) AS %s', $quoted)
+                            default => sprintf('(%s) AS %s', Fragment::SUBQUERY_PARAMETER_PLACEHOLDER, $quoted)
                         };
                         $this->append(new Fragment($query, [$value]));
                     } else if ($value === null || is_scalar($value)) {
-                        $query = match ($quoted = (new SimpleReference($key))->delimitedIdentifier) {
+                        $query = match ($quoted = new SimpleReference($key)->delimitedIdentifier) {
                             null => $key,
-                            default => sprintf('{#} AS %s', $quoted)
+                            default => sprintf('%s AS %s', Fragment::SINGLE_PARAMETER_PLACEHOLDER, $quoted)
                         };
                         $this->append(new Fragment($query, [$value]));
                     } else {
@@ -66,7 +67,7 @@ class SelectExpressionCollection extends FragmentCollection
         } elseif ($expression instanceof FragmentInterface) {
             $this->append($expression);
         } else {
-            $query = match ($quoted = (new ColumnReferenceWithAlias((string) $expression))->delimitedIdentifier) {
+            $query = match ($quoted = new ColumnReferenceWithAlias((string) $expression)->delimitedIdentifier) {
                 null => (string) $expression,
                 default => $quoted
             };

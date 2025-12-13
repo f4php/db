@@ -50,7 +50,7 @@ class TableWithColumnsReferenceCollection extends FragmentCollection
         } elseif ($expression instanceof FragmentInterface) {
             throw new InvalidArgumentException('Subqueries are not supported');
         } else {
-            $query = match ($quoted = (new TableReferenceWithAlias((string) $expression))->delimitedIdentifier) {
+            $query = match ($quoted = new TableReferenceWithAlias((string) $expression)->delimitedIdentifier) {
                 null => (string) $expression,
                 default => $quoted
             };

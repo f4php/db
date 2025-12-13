@@ -109,7 +109,7 @@ class FragmentCollection implements FragmentCollectionInterface, FragmentInterfa
             true => '',
             default => match ($this->prefix) {
                 null => $query,
-                default => sprintf('%s %s', $this->prefix, $query)
+                default => "{$this->prefix} {$query}",
             }
         };
     }
