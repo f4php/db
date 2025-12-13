@@ -4,33 +4,17 @@
 
 ## Table of Contents
 
-- [Overview](#overview)
-  - [Table of Contents](#table-of-contents)
-  - [Installation](#installation)
-  - [Quick Start](#quick-start)
-  - [Configuration](#configuration)
-  - [Key Concepts](#key-concepts)
-  - [Placeholders](#placeholders)
-  - [WHERE Clauses](#where-clauses)
-  - [Common Operations](#common-operations)
-    - [INSERT with Values](#insert-with-values)
-    - [UPDATE Statement](#update-statement)
-    - [DELETE Statement](#delete-statement)
-    - [UPSERT (INSERT with ON CONFLICT)](#upsert-insert-with-on-conflict)
-    - [JOIN Operations](#join-operations)
-    - [Common Table Expressions (CTEs)](#common-table-expressions-ctes)
-    - [Subqueries with `{#::#}` Placeholder](#subqueries-with--placeholder)
-  - [Getting Results](#getting-results)
-  - [Data Types](#data-types)
-  - [Usage Examples](#usage-examples)
-    - [Simple Query](#simple-query)
-    - [Slightly More Complex Query](#slightly-more-complex-query)
-  - [Best Practices](#best-practices)
-  - [Common Pitfalls](#common-pitfalls)
-    - [Builder Instances Are Mutable](#builder-instances-are-mutable)
-    - [Match Placeholder Types to Values](#match-placeholder-types-to-values)
-    - [Don't Manually Quote Auto-Quoted Identifiers](#dont-manually-quote-auto-quoted-identifiers)
-    - [Don't Forget Execution Methods](#dont-forget-execution-methods)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Configuration](#configuration)
+- [Key Concepts](#key-concepts)
+- [Placeholders](#placeholders)
+- [WHERE Clauses](#where-clauses)
+- [Common Operations](#common-operations)
+- [Getting Results](#getting-results)
+- [Data Types](#data-types)
+- [Best Practices](#best-practices)
+- [Common Pitfalls](#common-pitfalls)
 
 ## Installation
 
@@ -147,21 +131,6 @@ Currently supported keywords are:
 `with()`,
 `withRecursive()`
 
-The following methods support static invokation:
-
-`DB::raw()`,
-`DB::delete()`,
-`DB::dropTable()`,
-`DB::dropTableIfExists()`,
-`DB::dropTableWithCascade()`,
-`DB::dropTableIfExistsWithCascade()`,
-`DB::insert()`,
-`DB::select()`,
-`DB::selectDistinct()`,
-`DB::update()`,
-`DB::with()`,
-`DB::withRecursive()`
-
 It is the developer's responsibility to maintain valid SQL grammar when chaining DB method calls.
 
 ## Placeholders
@@ -229,12 +198,15 @@ DB::select()->from('user')->where(none::of(['banned' => true, 'deleted' => true]
 ### INSERT with Values
 
 ```php
+
+use F4\DB\Fragment;
+
 DB::insert()
     ->into('user')
     ->values([
         'name' => 'John Doe',
         'email' => 'john@example.com',
-        'created_at' => 'NOW()'
+        'created_at' => new Fragment('NOW()') // Fragment wrapper must be used to add SQL expression without converting it to a bound parameter
     ])
     ->returning('id')
     ->asValue();
@@ -244,7 +216,7 @@ DB::insert()
 
 ```php
 DB::update('user')
-    ->set(['active' => false, 'updated_at' => 'NOW()'])
+    ->set(['active' => false, '"updated_at" = NOW()'])
     ->where(['id' => 123])
     ->commit();
 ```
@@ -265,7 +237,7 @@ DB::insert()
     ->into('settings')
     ->values(['key' => 'theme', 'value' => 'dark'])
     ->onConflict('key')
-    ->doUpdateSet(['value' => 'dark', 'updated_at' => 'NOW()'])
+    ->doUpdateSet(['value' => 'dark', '"updated_at" = "NOW()'])
     ->commit();
 ```
 
@@ -382,6 +354,47 @@ DB::select(['"user".*', '"latest_order"."created_at" AS "last_order_date"'])
     ->asTable();
 ```
 
+### Complex Query example
+
+```php
+use F4\DB;
+use F4\DB\AnyConditionCollection as any;
+
+// ...
+
+$minEmployeesCount = 5;
+$statusFilter = ['ongoing', 'started'];
+
+$rows = DB::with([
+    'project' => DB::select([
+            '"project".*',
+            '"risks"."relation_jsonb" AS "unhandledRisks"',
+        ])
+        ->from('project')
+        ->leftJoinLateral([
+            '({#::#}) AS "risks"' => DB::select('jsonb_agg(to_jsonb("risk".*)) AS "relation_jsonb"')
+                ->from('risk')
+                ->where([
+                    '"project"."projectUUID" = "risk"."projectUUID"',
+                    'handled' => false, // Note: subquery placeholder ensures that all subquery parameters
+                                        // are correctly bound and processed in the main query
+                ]),
+        ])
+        ->on('true')
+    ])
+    ->select()
+    ->from('project')
+    ->where(
+        '"unhandledRisks" IS NOT NULL',
+        any::of([
+          '"employeesCount" >= {#}' => $minEmployeesCount,
+          'missionCritical' => true,
+        ]),
+        '"status" IN ({#,...#})' => $statusFilter,
+    )
+    ->asTable();
+```
+
 ## Getting Results
 
 After building a query, the following tail methods are available for fetching results:
@@ -441,69 +454,6 @@ The PostgreSQL adapter automatically applies the following casting rules:
     default:
   }
 ```
-
-## Usage Examples
-
-### Simple Query
-
-```php
-use F4\DB;
-
-$rows = DB::select()
-    ->from('table1 t1')
-    ->rightJoin("table2 t2")
-    ->using('fieldA', 'fieldB')
-    ->asTable();
-```
-
-This code will internally expand to the following SQL statement:
-
-```sql
-  SELECT * FROM "table1" AS "t1" RIGHT JOIN "table2" AS "t2" USING ("fieldA", "fieldB")
-```
-and fetch all available rows as a multi-dimensional PHP array.
-
-### Slightly More Complex Query
-
-```php
-use F4\DB;
-use F4\DB\AnyConditionCollection as any;
-
-// ...
-
-$minEmployeesCount = 5;
-$statusFilter = ['ongoing', 'started'];
-
-$rows = DB::with([
-    'project' => DB::select([
-            '"project".*',
-            '"risks"."relation_jsonb" AS "unhandledRisks"',
-        ])
-        ->from('project')
-        ->leftJoinLateral([
-            '({#::#}) AS "risks"' => DB::select('jsonb_agg(to_jsonb("risk".*)) AS "relation_jsonb"')
-                ->from('risk')
-                ->where([
-                    '"project"."projectUUID" = "risk"."projectUUID"',
-                    'handled' => false, // Note: subquery placeholder ensures that all subquery parameters
-                                        // are correctly bound and processed in the main query
-                ]),
-        ])
-        ->on('true')
-    ])
-    ->select()
-    ->from('project')
-    ->where(
-        '"unhandledRisks" IS NOT NULL',
-        any::of([
-          '"employeesCount" >= {#}' => $minEmployeesCount,
-          'missionCritical' => true,
-        ]),
-        '"status" IN ({#,...#})' => $statusFilter,
-    )
-    ->asTable();
-```
-
 ## Best Practices
 
 - **Always use placeholders for user input** - Never concatenate values into SQL strings to prevent SQL injection

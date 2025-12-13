@@ -192,15 +192,18 @@ DB::select(['u.name', 'o.total'])
 ### INSERT with Conflict Handling
 
 ```php
+
+use F4\DB\Fragment;
+
 DB::insert()
     ->into('users')
     ->values([
         'email' => 'user@example.com',
         'name' => 'John Doe',
-        'created_at' => 'NOW()'
+        'created_at' => new Fragment('NOW()') // Fragment wrapper must be used to add SQL expression without converting it to a bound parameter
     ])
     ->onConflict('email')
-    ->doUpdateSet(['name' => 'John Doe', 'updated_at' => 'NOW()'])
+    ->doUpdateSet(['name' => 'John Doe', '"updated_at" = NOW()'])
     ->returning('id')
     ->asValue();
 ```
@@ -209,7 +212,7 @@ DB::insert()
 
 ```php
 DB::update('users')
-    ->set(['active' => false, 'deactivated_at' => 'NOW()'])
+    ->set(['active' => false, '"deactivated_at" = NOW()'])
     ->where(['id' => 123])
     ->commit();
 ```
