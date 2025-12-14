@@ -3,13 +3,18 @@ parameters:
     - tests/F4/Config.php
   ignoreErrors:
     -
-      message: '#Property F4\\DB\\Adapter\\PostgresqlAdapter::\$connection in isset\(\) is not nullable nor uninitialized#'
-      path: src/F4/DB/Adapter/PostgresqlAdapter.php
-    -
-      message: '#Variable \$existingValuesFragmentCollection might not be defined#'
-      path: src/F4/DB.php
+      message: '#Unsafe usage of new static\(\)#'
+      paths:
+        - src/F4/DB.php
+        - src/F4/DBTransaction.php
+        - src/F4/DB/StaticOfMethodTrait.php
+
 services:
   -
     class: F4\PHPStan\Reflection\DB\DBClassReflectionExtension
+    tags:
+      - phpstan.broker.methodsClassReflectionExtension
+  -
+    class: F4\PHPStan\Reflection\DBTransaction\DBTransactionClassReflectionExtension
     tags:
       - phpstan.broker.methodsClassReflectionExtension

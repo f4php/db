@@ -17,12 +17,14 @@ use function is_array;
 use function is_string;
 
 /**
- * 
+ *
  * DBTransaction is a wrapper for executing atomic transactions
- * 
+ *
  * @package F4\DB
  * @author Dennis Kreminsky <dennis@kreminsky.com>
  *
+ * @method static DBTransaction add(QueryBuilderInterface|array<QueryBuilderInterface> $query) Add query to transaction (static)
+ * @method DBTransaction add(QueryBuilderInterface|array<QueryBuilderInterface> $query) Add query to transaction
  */
 class DBTransaction
 {
@@ -55,8 +57,8 @@ class DBTransaction
         $this->queries = [
             ...$this->queries,
             ...array_map(
-                // make sure all added queries implement QueryBuilderInterface and have the same adapter instance 
-                // (all transaction queries are required to use the same database connection)
+                // This makes sure all added queries implement QueryBuilderInterface and use the same adapter instance
+                // (all queries within single transaction are by design required to use the same database connection)
                 callback: fn(QueryBuilderInterface $query): QueryBuilderInterface => (clone $query)->useAdapter($this->adapter),
                 array: match (is_array($query)) {
                     true => $query,

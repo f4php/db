@@ -125,11 +125,11 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     {
         throw new BadMethodCallException('not implemented yet');
     }
-    public function createTable(...$arguments): static
+    public function createTable(string $name, array $columns): static
     {
         throw new BadMethodCallException('not implemented yet');
     }
-    public function createTableIfNotExists(...$arguments): static
+    public function createTableIfNotExists(string $name, array $columns): static
     {
         throw new BadMethodCallException('not implemented yet');
     }
@@ -473,19 +473,22 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     {
         array_map(
             callback: function ($argument) {
-                is_array($argument) &&
-                    match (($existingFieldsFragmentCollection = $this->findFragmentCollectionByName('insert_fields')) && ($existingValuesFragmentCollection = $this->findFragmentCollectionByName('insert_values'))) {
-                        false => $this
-                            ->append(new Parenthesize(new SimpleColumnReferenceCollection(...array_keys($argument))->withName('insert_fields_collection'))->withName('insert_fields'))
-                            ->append(new Parenthesize(new ValueExpressionCollection(...array_values($argument))->withName('insert_values_collection'))->withPrefix('VALUES')->withName('insert_values')),
-                        default => $existingFieldsFragmentCollection
+                if (is_array($argument)) {
+                    $existingFieldsFragmentCollection = $this->findFragmentCollectionByName('insert_fields');
+                    $existingValuesFragmentCollection = $this->findFragmentCollectionByName('insert_values');
+                    if ($existingFieldsFragmentCollection && $existingValuesFragmentCollection) {
+                        $existingFieldsFragmentCollection
                             ->findFragmentCollectionByName('insert_fields_collection')
-                            ->append(new SimpleColumnReferenceCollection(...array_keys($argument)))
-                        &&
+                            ->append(new SimpleColumnReferenceCollection(...array_keys($argument)));
                         $existingValuesFragmentCollection
                             ->findFragmentCollectionByName('insert_values_collection')
-                            ->append(new ValueExpressionCollection(...array_values($argument)))
+                            ->append(new ValueExpressionCollection(...array_values($argument)));
+                    } else {
+                        $this
+                            ->append(new Parenthesize(new SimpleColumnReferenceCollection(...array_keys($argument))->withName('insert_fields_collection'))->withName('insert_fields'))
+                            ->append(new Parenthesize(new ValueExpressionCollection(...array_values($argument))->withName('insert_values_collection'))->withPrefix('VALUES')->withName('insert_values'));
                     };
+                }
             },
             array: $arguments,
         );

@@ -1,39 +1,41 @@
-<?php 
+<?php
 
 declare(strict_types = 1);
 
 namespace F4\PhpStan\Reflection\DB;
 
-use BadMethodCallException;
-
 use F4\DB;
+use F4\DB\QueryBuilderInterface;
 use PHPStan\Reflection\ClassReflection;
 use PHPStan\Reflection\MethodReflection;
 use PHPStan\Reflection\MethodsClassReflectionExtension;
+use PHPStan\Reflection\ReflectionProvider;
 
 class DBClassReflectionExtension implements MethodsClassReflectionExtension
 {
 
+	public function __construct(private ReflectionProvider $reflectionProvider) {}
+
 	public function hasMethod(ClassReflection $classReflection, string $methodName): bool
 	{
-		// TODO: read the docs and make a proper implementation
-		try {
-			if($methodName === 'limit' || $methodName === 'offset') {
-				(new DB)->__call($methodName, [0]);
-			}
-			else {
-				(new DB)->__call($methodName, []);
-			}
-		}
-		catch(BadMethodCallException $exception) {
+		// Only apply this extension to F4\DB class
+		if ($classReflection->getName() !== DB::class) {
 			return false;
-		};
-		return true;
+		}
+
+		// DB class delegates all magic method calls to QueryBuilderInterface
+		// Use PHPStan's reflection to check if the method exists on QueryBuilderInterface
+		if (!$this->reflectionProvider->hasClass(QueryBuilderInterface::class)) {
+			return false;
+		}
+
+		$queryBuilderReflection = $this->reflectionProvider->getClass(QueryBuilderInterface::class);
+		return $queryBuilderReflection->hasMethod($methodName);
 	}
 
 	public function getMethod(ClassReflection $classReflection, string $methodName): MethodReflection
 	{
-		return new DBMethodReflectionExtension($methodName, $classReflection);
+		return new DBMethodReflectionExtension($methodName, $classReflection, $this->reflectionProvider);
 	}
 
 }
