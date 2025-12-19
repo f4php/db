@@ -237,7 +237,7 @@ DB::insert()
     ->into('settings')
     ->values(['key' => 'theme', 'value' => 'dark'])
     ->onConflict('key')
-    ->doUpdateSet(['value' => 'dark', '"updated_at" = "NOW()'])
+    ->doUpdateSet(['value' => 'dark', '"updated_at" = NOW()'])
     ->commit();
 ```
 
