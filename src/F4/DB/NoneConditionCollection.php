@@ -5,14 +5,18 @@ declare(strict_types=1);
 namespace F4\DB;
 
 use Composer\Pcre\Preg;
-use F4\DB\ConditionCollection;
-use F4\DB\FragmentInterface;
-use F4\DB\StaticOfMethodTrait;
+use F4\DB\{
+    ConditionCollection,
+    FragmentInterface,
+    StaticOfMethodTrait,
+};
 
-use function array_filter;
-use function array_map;
-use function implode;
-use function sprintf;
+use function
+    array_filter,
+    array_map,
+    implode,
+    sprintf
+;
 
 /**
  * 

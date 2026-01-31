@@ -4,37 +4,43 @@ declare(strict_types=1);
 
 namespace F4\DB;
 
-use BadMethodCallException;
-use InvalidArgumentException;
+use
+    BadMethodCallException,
+    InvalidArgumentException
+;
+use F4\DB\{
+    Adapter\AdapterInterface,
+    AssignmentCollection,
+    ConditionCollection,
+    FragmentInterface,
+    FragmentCollection,
+    FragmentCollectionInterface,
+    OrderCollection,
+    Parenthesize,
+    QueryBuilderInterface,
+    SelectExpressionCollection,
+    SimpleColumnReferenceCollection,
+    TableReferenceCollection,
+    TableWithColumnsReferenceCollection,
+    ValueExpressionCollection,
+    WithTableReferenceCollection,
+};
+use F4\{
+    Config,
+    HookManager,
+};
 
-use F4\DB\Adapter\AdapterInterface;
-use F4\DB\AssignmentCollection;
-use F4\DB\ConditionCollection;
-use F4\DB\FragmentInterface;
-use F4\DB\FragmentCollection;
-use F4\DB\FragmentCollectionInterface;
-use F4\DB\OrderCollection;
-use F4\DB\Parenthesize;
-use F4\DB\QueryBuilderInterface;
-use F4\DB\SelectExpressionCollection;
-use F4\DB\SimpleColumnReferenceCollection;
-use F4\DB\TableReferenceCollection;
-use F4\DB\TableWithColumnsReferenceCollection;
-use F4\DB\ValueExpressionCollection;
-use F4\DB\WithTableReferenceCollection;
-
-use F4\HookManager;
-
-use F4\Config;
-
-use function array_key_exists;
-use function array_keys;
-use function array_map;
-use function array_values;
-use function is_array;
-use function is_int;
-use function is_string;
-use function sprintf;
+use function
+    array_key_exists,
+    array_keys,
+    array_map,
+    array_values,
+    count,
+    is_array,
+    is_int,
+    is_string,
+    sprintf
+;
 
 class QueryBuilder extends FragmentCollection implements FragmentInterface, FragmentCollectionInterface, QueryBuilderInterface
 {

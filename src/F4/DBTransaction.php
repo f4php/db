@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace F4;
 
-use BadMethodCallException;
-
+use BadMethodCallException,
+    Throwable;
 use F4\Config;
-use F4\DB\Adapter\AdapterInterface;
-use F4\DB\QueryBuilderInterface;
-use Throwable;
+use F4\DB\{
+    QueryBuilderInterface,
+    Adapter\AdapterInterface,
+};
 
-use function array_map;
-use function implode;
-use function is_array;
-use function is_string;
+use function
+    array_map,
+    implode,
+    is_array,
+    is_string
+;
 
 /**
  *

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace F4\DB;
 
-use F4\DB\ConditionCollection;
-use F4\DB\StaticOfMethodTrait;
+use F4\DB\{
+    ConditionCollection,
+    StaticOfMethodTrait,
+};
 
 /**
  * 

@@ -9,8 +9,10 @@ use InvalidArgumentException;
 use F4\DB;
 use F4\DB\Reference\ReferenceInterface;
 
-use function mb_trim;
-use function sprintf;
+use function
+    mb_trim,
+    sprintf
+;
 
 /**
  * 

@@ -7,12 +7,14 @@ namespace F4\DB;
 use InvalidArgumentException;
 use F4\DB\Reference\SimpleReference;
 
-use function is_array;
-use function is_numeric;
-use function is_scalar;
-use function mb_strtoupper;
-use function mb_trim;
-use function sprintf;
+use function
+    is_array,
+    is_numeric,
+    is_scalar,
+    mb_strtoupper,
+    mb_trim,
+    sprintf
+;
 
 /**
  * 

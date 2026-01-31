@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace F4\DB;
 
 use InvalidArgumentException;
-use F4\DB\Parenthesize;
-use F4\DB\Reference\SimpleReference;
-use F4\DB\Reference\TableReferenceWithAlias;
-use F4\DB\SimpleColumnReferenceCollection;
+use F4\DB\{
+    Parenthesize,
+    SimpleColumnReferenceCollection,
+    Reference\TableReferenceWithAlias,
+};
 
-use function is_array;
-use function is_numeric;
+use function
+    is_array,
+    is_numeric
+;
 
 /**
  * 

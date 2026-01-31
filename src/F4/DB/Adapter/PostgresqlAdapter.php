@@ -4,54 +4,59 @@ declare(strict_types=1);
 
 namespace F4\DB\Adapter;
 
-use DateTime;
-use ErrorException;
-use InvalidArgumentException;
-use Throwable;
+use DateTime,
+    ErrorException,
+    InvalidArgumentException,
+    Throwable;
 use F4\Config;
 use F4\DB\Adapter\AdapterInterface;
-use F4\DB\Exception\DuplicateColumnException;
-use F4\DB\Exception\DuplicateFunctionException;
-use F4\DB\Exception\DuplicateRecordException;
-use F4\DB\Exception\DuplicateSchemaException;
-use F4\DB\Exception\DuplicateTableException;
-use F4\DB\Exception\Exception;
-use F4\DB\Exception\InvalidTableDefinitionException;
-use F4\DB\Exception\ParameterMismatchException;
-use F4\DB\Exception\SyntaxErrorException;
-use F4\DB\Exception\UnknownColumnException;
-use F4\DB\Exception\UnknownFunctionException;
-use F4\DB\Exception\UnknownTableException;
+use F4\DB\Exception\{
+    DuplicateColumnException,
+    DuplicateFunctionException,
+    DuplicateRecordException,
+    DuplicateSchemaException,
+    DuplicateTableException,
+    Exception,
+    InvalidTableDefinitionException,
+    ParameterMismatchException,
+    SyntaxErrorException,
+    UnknownColumnException,
+    UnknownFunctionException,
+    UnknownTableException,
+};
 use F4\DB\PreparedStatement;
 
-use PgSql\Connection;
-use PgSql\Result;
+use PgSql\{
+    Connection,
+    // Result,
+};
 
-use function array_map;
-use function count;
-use function is_array;
-use function is_bool;
-use function is_float;
-use function is_int;
-use function is_scalar;
-use function json_decode;
-use function mb_substr;
-use function mb_trim;
-use function pg_escape_identifier;
-use function pg_escape_literal;
-use function pg_fetch_row;
-use function pg_field_name;
-use function pg_field_type;
-use function pg_free_result;
-use function pg_get_result;
-use function pg_last_error;
-use function pg_query;
-use function pg_result_error_field;
-use function pg_result_status;
-use function pg_send_query_params;
-use function pg_send_query;
-use function pg_set_client_encoding;
-use function sprintf;
+use function 
+    array_map,
+    count,
+    is_array,
+    is_bool,
+    is_float,
+    is_int,
+    is_scalar,
+    json_decode,
+    mb_substr,
+    mb_trim,
+    pg_escape_identifier,
+    pg_escape_literal,
+    pg_fetch_row,
+    pg_field_name,
+    pg_field_type,
+    pg_free_result,
+    pg_get_result,
+    pg_last_error,
+    pg_query,
+    pg_result_error_field,
+    pg_result_status,
+    pg_send_query_params,
+    pg_send_query,
+    pg_set_client_encoding,
+    sprintf;
 
 /**
  * 
@@ -223,7 +228,7 @@ class PostgresqlAdapter implements AdapterInterface
                 throw new ErrorException('Database connection failed', 500);
             }
         } catch (ErrorException $e) {
-            match (Config::DEBUG_MODE) {
+            match (Config::DEBUG_MODE && ($connection !== false)) {
                 true => throw new ErrorException(message: sprintf("Database connection error: %s", pg_last_error($connection)), code: 500, previous: $e),
                 default => throw $e
             };

@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace F4\DB;
 
-use F4\DB\FragmentCollection;
-use F4\DB\FragmentCollectionInterface;
-use F4\DB\FragmentInterface;
+use F4\DB\{
+    FragmentCollection,
+    FragmentCollectionInterface,
+    FragmentInterface
+};
 
-use function array_filter;
-use function array_map;
-use function implode;
-use function sprintf;
+use function
+    array_filter,
+    array_map,
+    implode,
+    sprintf
+;
 
 /**
  * 

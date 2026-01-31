@@ -6,9 +6,11 @@ namespace F4\DB;
 
 use InvalidArgumentException;
 
-use function is_array;
-use function is_numeric;
-use function is_scalar;
+use function
+    is_array,
+    is_numeric,
+    is_scalar
+;
 
 /**
  * 

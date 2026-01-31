@@ -6,8 +6,10 @@ namespace F4\DB\Reference;
 
 use InvalidArgumentException;
 use F4\DB;
-use F4\DB\Reference\ReferenceInterface;
-use F4\DB\Reference\SimpleReference;
+use F4\DB\{
+    Reference\ReferenceInterface,
+    Reference\SimpleReference,
+};
 
 use function sprintf;
 

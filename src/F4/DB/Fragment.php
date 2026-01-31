@@ -6,18 +6,22 @@ namespace F4\DB;
 
 use Composer\Pcre\Preg;
 use InvalidArgumentException;
-use F4\DB\FragmentInterface;
-use F4\DB\PreparedStatement;
+use F4\DB\{
+    FragmentInterface,
+    PreparedStatement,
+};
 
-use function array_key_exists;
-use function array_map;
-use function array_shift;
-use function count;
-use function implode;
-use function is_array;
-use function is_object;
-use function preg_quote;
-use function sprintf;
+use function
+    array_key_exists,
+    array_map,
+    array_shift,
+    count,
+    implode,
+    is_array,
+    is_object,
+    preg_quote,
+    sprintf
+;
 
 /**
  * 

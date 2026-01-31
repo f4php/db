@@ -5,21 +5,25 @@ declare(strict_types=1);
 namespace F4\DB;
 
 use Composer\Pcre\Preg;
-use F4\DB\Reference\ColumnReference;
-use F4\DB\Fragment;
-use F4\DB\FragmentCollection;
-use F4\DB\FragmentInterface;
-use F4\DB\StaticOfMethodTrait;
+use F4\DB\{
+    Fragment,
+    FragmentCollection,
+    FragmentInterface,
+    StaticOfMethodTrait,
+    Reference\ColumnReference,
+};
 use InvalidArgumentException;
 
-use function array_filter;
-use function array_map;
-use function count;
-use function implode;
-use function is_array;
-use function is_numeric;
-use function is_scalar;
-use function sprintf;
+use function
+    array_filter,
+    array_map,
+    count,
+    implode,
+    is_array,
+    is_numeric,
+    is_scalar,
+    sprintf
+;
 
 /**
  * 

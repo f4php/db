@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace F4\DB;
 
-use F4\DB\Fragment;
-use F4\DB\Reference\SimpleReference;
-use F4\DB\Reference\ColumnReferenceWithAlias;
+use F4\DB\{
+    Fragment,
+    Reference\SimpleReference,
+    Reference\ColumnReferenceWithAlias,
+};
 use InvalidArgumentException;
 
-use function count;
-use function is_array;
-use function is_numeric;
-use function is_scalar;
-use function sprintf;
+use function
+    count,
+    is_array,
+    is_numeric,
+    is_scalar,
+    sprintf
+;
 
 /**
  * 

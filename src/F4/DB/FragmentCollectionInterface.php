@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace F4\DB;
 
-use F4\DB\FragmentInterface;
-use F4\DB\PreparedStatement;
+use F4\DB\{
+    FragmentInterface,
+    PreparedStatement
+};
 
 interface FragmentCollectionInterface
 {

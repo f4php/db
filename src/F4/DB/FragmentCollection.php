@@ -5,18 +5,22 @@ declare(strict_types=1);
 namespace F4\DB;
 
 use InvalidArgumentException;
-use F4\DB\Fragment;
-use F4\DB\FragmentCollectionInterface;
-use F4\DB\FragmentInterface;
-use F4\DB\PreparedStatement;
+use F4\DB\{
+    Fragment,
+    FragmentCollectionInterface,
+    FragmentInterface,
+    PreparedStatement
+};
 
-use function array_filter;
-use function array_find;
-use function array_map;
-use function array_reduce;
-use function implode;
-use function is_array;
-use function is_numeric;
+use function 
+    array_filter,
+    array_find,
+    array_map,
+    array_reduce,
+    implode,
+    is_array,
+    is_numeric
+;
 
 /**
  * 

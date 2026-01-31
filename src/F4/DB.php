@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace F4;
 
-use BadMethodCallException;
-use F4\DB\Adapter\AdapterInterface;
-use F4\DB\QueryBuilder;
-use F4\DB\QueryBuilderInterface;
+use BadMethodCallException,
+    TypeError
+;
+use F4\DB\{
+    QueryBuilder,
+    QueryBuilderInterface,
+    Adapter\AdapterInterface,
+};
 use F4\Config;
-use TypeError;
 
 use function str_contains;
 

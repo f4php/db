@@ -8,8 +8,10 @@ use InvalidArgumentException;
 
 use F4\DB\Reference\ColumnReference;
 
-use function is_array;
-use function is_numeric;
+use function
+    is_array,
+    is_numeric
+;
 
 /**
  * 
