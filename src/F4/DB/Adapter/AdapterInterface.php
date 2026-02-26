@@ -10,6 +10,7 @@ interface AdapterInterface
 {
     public function execute(PreparedStatement $statement, ?int $stopAfter = null): mixed;
     public function enumerateParameters(int $index): string;
+    public function getEscapedBinary(string $value): string;
     public function getEscapedValue(mixed $value): string;
     public function getEscapedIdentifier(string $identifier): string;
 }

@@ -28,6 +28,14 @@ final class MockAdapter implements AdapterInterface
     {
         return sprintf('$%d', $index);
     }
+    public function getEscapedBinary(string $value): string
+    {
+        return $value;
+    }
+    public function getEscapedIdentifier(string $value): string
+    {
+        return sprintf('"%s"', Preg::replace(pattern: '/"/u', replacement: '""', subject: $value));
+    }
     public function getEscapedValue(mixed $value): string
     {
         return match ($value === null) {
@@ -47,9 +55,4 @@ final class MockAdapter implements AdapterInterface
                 }
         };
     }
-    public function getEscapedIdentifier(string $value): string
-    {
-        return sprintf('"%s"', Preg::replace(pattern: '/"/u', replacement: '""', subject: $value));
-    }
-
 }

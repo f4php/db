@@ -42,6 +42,7 @@ use function
     json_decode,
     mb_substr,
     mb_trim,
+    pg_escape_bytea,
     pg_escape_identifier,
     pg_escape_literal,
     pg_fetch_row,
@@ -56,6 +57,7 @@ use function
     pg_send_query_params,
     pg_send_query,
     pg_set_client_encoding,
+    pg_unescape_bytea,
     sprintf;
 
 /**
@@ -189,6 +191,9 @@ class PostgresqlAdapter implements AdapterInterface
                         default => null
                     };
                     break;
+                case 'bytea':
+                    $value = pg_unescape_bytea($value);
+                    break;
                 // TODO: process pgsql arrays http://stackoverflow.com/questions/9169176/accessing-psql-array-directly-in-php
                 //        case '_text':
                 //                  if($parts='')
@@ -277,6 +282,13 @@ class PostgresqlAdapter implements AdapterInterface
                         }
                 }
         };
+    }
+    public function getEscapedBinary(string $value): string
+    {
+        if (!$this->connection) {
+            throw new ErrorException('Failed to connect to the database', 500);
+        }
+        return pg_escape_bytea($this->connection, $value);
     }
     public function getEscapedIdentifier(mixed $value): string
     {
