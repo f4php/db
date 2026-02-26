@@ -199,6 +199,10 @@ class DB
             };
         }
     }
+    public static function escapeBinary(string $string): string
+    {
+        return new static()->queryBuilder->escapeBinary($string);
+    }
     public static function escapeIdentifier(string $identifier): string
     {
         return new static()->queryBuilder->escapeIdentifier($identifier);

@@ -219,6 +219,10 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
         $this->resetAllFragmentCollectionsNames();
         return $this;
     }
+    public function escapeBinary(string $string): string
+    {
+        return $this->adapter->getEscapedBinary($string);
+    }
     public function escapeIdentifier(string $identifier): string
     {
         return $this->adapter->getEscapedIdentifier($identifier);
