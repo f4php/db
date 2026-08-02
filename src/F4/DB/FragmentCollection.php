@@ -98,13 +98,13 @@ class FragmentCollection implements FragmentCollectionInterface, FragmentInterfa
             initial: [],
         );
     }
-    public function getPreparedStatement(?callable $enumeratorFunction = null): PreparedStatement
+    public function getPreparedStatement(?callable $enumeratorCallback = null): PreparedStatement
     {
         $fragment = new Fragment(
             query: $this->getQuery(),
             parameters: $this->getParameters(),
         );
-        return $fragment->getPreparedStatement($enumeratorFunction);
+        return $fragment->getPreparedStatement($enumeratorCallback);
     }
     public function getQuery(): string
     {
