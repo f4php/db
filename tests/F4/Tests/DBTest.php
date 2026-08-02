@@ -229,6 +229,8 @@ final class DBTest extends TestCase
         $this->assertSame('SELECT * FROM "table1" AS "t1" INNER JOIN LATERAL "table2" AS "t2"', $db14->getPreparedStatement()->query);
         $db15 = DB::select()->from('table1 t1')->crossJoinLateral("table2 t2");
         $this->assertSame('SELECT * FROM "table1" AS "t1" CROSS JOIN LATERAL "table2" AS "t2"', $db15->getPreparedStatement()->query);
+        $db16 = DB::select()->from('table1 t1')->fullOuterJoin("table2 t2");
+        $this->assertSame('SELECT * FROM "table1" AS "t1" FULL OUTER JOIN "table2" AS "t2"', $db16->getPreparedStatement()->query);
     }
     public function testDelete(): void
     {

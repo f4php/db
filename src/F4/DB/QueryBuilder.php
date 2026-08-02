@@ -248,7 +248,8 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     public function fullOuterJoin(...$arguments): static
     {
         $this
-            ->append('FULL OUTER JOIN');
+            ->append(new TableReferenceCollection(...$arguments)
+            ->withPrefix('FULL OUTER JOIN'));
         return $this;
     }
     public function group(...$arguments): static
