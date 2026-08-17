@@ -70,7 +70,10 @@ class SqliteAdapter implements AdapterInterface
         int $connectionFlags = 0,
         ?callable $resultConverter = null,
     ) {
-        $this->connectionString = $connectionString ?? Config::DB_NAME;
+        $this->connectionString = match (!empty($connectionString)) {
+            true => $connectionString,
+            default => Config::DB_NAME,
+        };
         if ($this->connectionString === '') {
             throw new InvalidArgumentException('SQLite database filename cannot be empty; use ":memory:" for an in-memory database');
         }

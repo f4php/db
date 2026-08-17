@@ -22,6 +22,8 @@
 composer require f4php/db
 ```
 
+PostgreSQL is the primary, first-class database and `ext-pgsql` is a package requirement. Optional adapters are also included for SQLite (`ext-sqlite3`) and MySQL (`ext-mysqli`); these extensions are listed under Composer `suggest` and must be installed separately when the corresponding adapter is used. The optional adapters do not currently remove the package-level `ext-pgsql` requirement.
+
 ## Quick Start
 
 ```php
@@ -66,31 +68,133 @@ class Config {
     public const ?string DB_APP_NAME = null;
     public const string DB_ADAPTER_CLASS = \F4\DB\Adapter\PostgresqlAdapter::class;
     public const bool DB_PERSIST = true;
+    public const bool DEBUG_MODE = true;
+    public const string TIMEZONE = '';
 }
 ```
 
 ### Database Adapters
 
-The active adapter is selected via `DB_ADAPTER_CLASS` (or by passing an adapter to a builder at runtime via `useAdapter()`). Two adapters ship with the package:
+The active adapter is selected via `DB_ADAPTER_CLASS`, or by passing an adapter instance to a builder with `useAdapter()`.
 
-- **`\F4\DB\Adapter\PostgresqlAdapter`** (default) — uses the `pgsql` extension. Prepared-statement placeholders are enumerated as `$1, $2, …`.
-- **`\F4\DB\Adapter\SqliteAdapter`** — uses the native `SQLite3` extension (`ext-sqlite3`, listed under `suggest`). Placeholders are enumerated as `?`. `DB_NAME` is the database filename (use `":memory:"` for an in-memory database).
+| Adapter | Support level | PHP extension | Prepared parameters | Identifier quoting |
+| --- | --- | --- | --- | --- |
+| `PostgresqlAdapter` | First-class; default | `ext-pgsql` | `$1`, `$2`, … | `"identifier"` |
+| `SqliteAdapter` | Optional; not first-class | `ext-sqlite3` | `?` | `"identifier"` |
+| `MysqlAdapter` | Optional; not first-class | `ext-mysqli` | `?` | `` `identifier` `` |
+
+The optional adapters provide connections, prepared-parameter binding, result fetching and conversion, error mapping, and database-appropriate identifier quoting. The query builder itself remains PostgreSQL-oriented, so availability of an adapter does not imply that every builder method emits SQL accepted by that database.
+
+#### PostgreSQL configuration
+
+`PostgresqlAdapter` uses all of the configuration constants shown above. When no explicit connection string is supplied, it builds one in this form:
+
+```text
+host='localhost' port='5432' dbname='application' user='app' password='secret'
+```
+
+If `DB_HOST` begins with `/`, it is treated as a Unix-socket directory and `DB_PORT` is omitted. `DB_CHARSET`, `DB_SCHEMA`, `DB_APP_NAME`, and `TIMEZONE` are applied after connecting, and `DB_PERSIST` selects persistent or non-persistent PostgreSQL connections.
+
+#### SQLite configuration
+
+For SQLite, `DB_NAME` is the database filename. Use `:memory:` for an in-memory database:
 
 ```php
 class Config {
-    // ...
-    public const string DB_NAME = '/var/data/app.sqlite'; // or ':memory:'
+    public const string DB_NAME = '/var/data/app.sqlite';
     public const string DB_ADAPTER_CLASS = \F4\DB\Adapter\SqliteAdapter::class;
 }
 ```
 
-`SqliteAdapter` accepts an optional result-converter callback (constructor argument) or can be subclassed to override `convertResultValue()` — SQLite exposes storage classes rather than declared column types, so mapping by output alias is recommended. Identifier quoting on both adapters is connectionless (no database connection is opened merely to build or render a query).
+An explicit non-empty constructor connection string replaces `DB_NAME`; a null or empty string falls back to `DB_NAME`. `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_SCHEMA`, `DB_APP_NAME`, `DB_PERSIST`, and `TIMEZONE` are not used. The adapter enables foreign-key enforcement and a 5-second busy timeout when it opens a connection.
+
+#### MySQL configuration
+
+For MySQL, configure the same core constants used by PostgreSQL, with MySQL-specific values:
+
+```php
+class Config {
+    public const string DB_HOST = 'localhost';
+    public const string DB_PORT = '3306';
+    public const string DB_NAME = 'application';
+    public const string DB_USERNAME = 'app';
+    public const string DB_PASSWORD = 'secret';
+    public const string DB_CHARSET = 'utf8mb4';
+    public const string TIMEZONE = '';
+    public const bool DB_PERSIST = true;
+    public const string DB_ADAPTER_CLASS = \F4\DB\Adapter\MysqlAdapter::class;
+}
+```
+
+When no explicit connection string is supplied, `MysqlAdapter` builds the same key/value form as `PostgresqlAdapter`:
+
+```text
+host='localhost' port='3306' dbname='application' user='app' password='secret'
+```
+
+If `DB_HOST` begins with `/`, it is treated as a Unix-socket path and the generated string omits `port`. Explicit strings may additionally use `database`, `username`, `charset`, and `socket` keys as aliases or connection options:
+
+```php
+$adapter = new \F4\DB\Adapter\MysqlAdapter(
+    "host='db.internal' port='3306' dbname='application' "
+    . "user='app' password='secret' charset='utf8mb4'",
+);
+
+$rows = DB::select()
+    ->from('user')
+    ->useAdapter($adapter)
+    ->asTable();
+```
+
+`DB_CHARSET` is applied with `mysqli::set_charset()`, `TIMEZONE` is applied as the session `time_zone`, and `DB_PERSIST` controls the `mysqli` persistent-host prefix. `DB_SCHEMA` and `DB_APP_NAME` are not used by `MysqlAdapter`.
+
+#### Optional-adapter SQL compatibility
+
+SQLite and MySQL support is intentionally not first-class. In particular:
+
+- PostgreSQL-specific raw expressions that use double-quoted identifiers may need rewriting for MySQL.
+- `onConflict()`, `doNothing()`, and `doUpdateSet()` generate PostgreSQL/SQLite-style `ON CONFLICT` syntax; MySQL instead uses `ON DUPLICATE KEY UPDATE`.
+- MySQL does not support `FULL OUTER JOIN` and does not generally support DML `RETURNING`; lateral and set-operation syntax is version-dependent.
+- SQLite does not support lateral joins or `DROP TABLE ... CASCADE`; support for features such as `RETURNING` and right/full joins also depends on the deployed SQLite version.
+- Set-operation and grouping variants vary by MySQL and SQLite version. Validate generated SQL against the target server and use `raw()` where a database-specific statement is required.
+
+#### Optional result conversion
+
+Both optional adapters expose `convertResultValue()` for subclass customization and accept an optional constructor callback. SQLite callbacks receive the value, output column name, column index, and SQLite storage-class constant:
+
+```php
+$adapter = new \F4\DB\Adapter\SqliteAdapter(
+    ':memory:',
+    resultConverter: static fn (
+        mixed $value,
+        string $columnName,
+        int $columnIndex,
+        int $sqliteType,
+    ): mixed => $columnName === 'is_active' ? (bool) $value : $value,
+);
+```
+
+MySQL callbacks additionally receive the MySQL field flags:
+
+```php
+$adapter = new \F4\DB\Adapter\MysqlAdapter(
+    resultConverter: static fn (
+        mixed $value,
+        string $columnName,
+        int $columnIndex,
+        int $mysqlType,
+        int $mysqlFlags,
+    ): mixed => $columnName === 'is_active' ? (bool) $value : $value,
+);
+```
+
+Mapping by an explicit output alias is recommended for application-level types such as booleans because SQLite storage classes and MySQL field metadata do not always preserve that semantic distinction.
 
 ## Key Concepts
 
 DB aims to replicate SQL syntax using native PHP expressions as closely as possible.
 
-It is primarily focused on PostgreSQL syntax. Its adapter-based architecture enables support for other database engines: a **PostgreSQL** adapter and a **SQLite** adapter (backed by the native `SQLite3` extension) are provided out of the box. Identifiers are quoted by the *active* adapter at query-render time, so the same query builder produces adapter-appropriate SQL.
+It is primarily focused on PostgreSQL syntax. `PostgresqlAdapter` is first-class; `SqliteAdapter` and `MysqlAdapter` provide optional, non-first-class execution support. Identifiers are quoted by the *active* adapter at query-render time, but raw expressions and SQL grammar remain the caller's responsibility.
 
 DB currently supports a significant but still limited subset of SQL syntax, which is gradually expanding as new features are added.
 
@@ -161,6 +265,8 @@ Three placeholder types are supported:
 `{#,...#}` for an array
 
 `{#::#}` for a DB Query Builder object instance
+
+These placeholders are internal builder syntax. At preparation time, the active adapter converts scalar placeholders to `$1`, `$2`, … for PostgreSQL or positional `?` parameters for SQLite and MySQL.
 
 Refer to the Usage Examples section below for practical demonstration.
 
@@ -426,7 +532,7 @@ After building a query, the following tail methods are available for fetching re
 
 `$query->asSQL()` to get SQL with values escaped (for debugging - **not for execution**)
 
-`$query->getPreparedStatement()->query` to get SQL with parameter placeholders as supported by the database server ($1, $2, etc.)
+`$query->getPreparedStatement()->query` to get SQL using the active adapter's parameter convention: PostgreSQL produces `$1`, `$2`, …, while SQLite and MySQL produce positional `?` parameters. An explicit enumerator callback overrides the adapter. Standalone `Fragment` instances without adapter context retain the PostgreSQL-style `$n` fallback
 
 `$query->getPreparedStatement()->parameters` to get array of bound parameters
 
@@ -435,6 +541,8 @@ After building a query, the following tail methods are available for fetching re
 DB attempts to cast returned values to appropriate PHP types, but since PHP and DBMS type systems are not fully compatible, some inconsistencies may occur. Type conversion is adapter-specific.
 
 The **SQLite adapter** returns values in SQLite's native storage classes by default; supply a result-converter callback to the `SqliteAdapter` constructor (or override `convertResultValue()`) to map values to application types.
+
+The **MySQL adapter** returns values from the `mysqli` prepared-statement protocol and decodes columns reported as MySQL `JSON` into associative arrays. MySQL does not distinguish `BOOLEAN` from `TINYINT(1)` reliably in result metadata, so boolean and other application-specific conversion should use the optional constructor callback or an override of `convertResultValue()`.
 
 The **PostgreSQL adapter** automatically applies the following casting rules:
 

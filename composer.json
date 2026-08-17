@@ -36,6 +36,7 @@
         "f4php/hookmanager": "^0.0.2"
     },
     "suggest": {
+        "ext-mysqli": "Required to use MysqlAdapter",
         "ext-sqlite3": "Required to use SqliteAdapter"
     },
     "require-dev": {
