@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace F4\Tests\DB;
 
 use Composer\Pcre\Preg;
-use DateTime;
+use DateTimeInterface;
 use F4\DB\Adapter\AdapterInterface;
 use F4\DB\PreparedStatement;
 use InvalidArgumentException;
@@ -44,8 +44,8 @@ final class MockAdapter implements AdapterInterface
                     true => $value ? 'TRUE' : 'FALSE',
                     default => match (is_int($value) || is_float($value)) {
                             true => (string) $value,
-                            default => match ($value instanceof DateTime) {
-                                    true => $value->format('Y-m-d H:i:s'),
+                            default => match ($value instanceof DateTimeInterface) {
+                                    true => sprintf("'%s'", $value->format('Y-m-d\TH:i:s.uP')),
                                     default => match (is_scalar($value)) {
                                             true => sprintf("'%s'", Preg::replace(pattern: "/'/u", replacement: "''", subject: $value)),
                                             default => throw new InvalidArgumentException('Unsupported parameter type')

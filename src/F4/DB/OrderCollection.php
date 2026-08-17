@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace F4\DB;
 
+use F4\DB\Reference\ColumnReference;
 use InvalidArgumentException;
-use F4\DB\Reference\SimpleReference;
 
 use function
+    count,
     is_array,
     is_numeric,
     is_scalar,
+    is_string,
     mb_strtoupper,
     mb_trim,
     sprintf
@@ -38,22 +40,32 @@ class OrderCollection extends FragmentCollection
             foreach ($expression as $key => $value) {
                 if (is_numeric($key)) {
                     $this->addExpression($value);
-                } elseif (is_scalar($value) && ((mb_trim(mb_strtoupper($value)) === 'ASC') || (mb_trim(mb_strtoupper($value)) === 'DESC'))) {
-                    $direction = mb_trim(mb_strtoupper($value));
-                    $reference = new SimpleReference($key)->getDelimited();
+                    continue;
+                }
+
+                $query = (string) $key;
+                $placeholders = Fragment::extractPlaceholders($query);
+                $direction = is_string($value) ? mb_trim(mb_strtoupper($value)) : null;
+
+                if ($placeholders === [] && ($direction === 'ASC' || $direction === 'DESC')) {
+                    $reference = new ColumnReference($query)->getDelimited();
                     $this->append(match ($reference) {
-                        null => new Fragment(sprintf('%s %s', $key, $direction)),
+                        null => new Fragment(sprintf('%s %s', $query, $direction)),
                         default => new Fragment(sprintf('%s %s', Fragment::SUBQUERY_PARAMETER_PLACEHOLDER, $direction), [$reference])
                     });
                 } else {
-                    throw new InvalidArgumentException("Order epxression must be an array in the form 'field_name'=>'asc' or 'field_name'=>'desc'");
+                    $parameters = is_array($value) && count($placeholders) > 1 ? $value : [$value];
+                    $this->append(new Fragment($query, $parameters));
                 }
             }
         } elseif ($expression instanceof FragmentInterface) {
             $this->append($expression);
+        } elseif (is_scalar($expression)) {
+            $query = (string) $expression;
+            $reference = new ColumnReference($query)->getDelimited();
+            $this->append($reference ?? new Fragment($query));
         } else {
-            throw new InvalidArgumentException("Order epxression must be an array in the form 'field_name'=>'asc' or 'field_name'=>'desc'");
+            throw new InvalidArgumentException('Order expression must be an identifier, SQL string, FragmentInterface, or array');
         }
     }
 }
-

@@ -125,7 +125,7 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     {
         $preparedStatement = $this->getPreparedStatement($this->adapter->enumerateParameters(...));
         HookManager::triggerHook(HookManager::BEFORE_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters]);
-        $result = $this->adapter->execute(statement: $preparedStatement, stopAfter: $stopAfter);
+        $result = $this->adapter->execute($preparedStatement, $stopAfter);
         HookManager::triggerHook(HookManager::AFTER_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters, 'result' => $result]);
         return $result;
     }

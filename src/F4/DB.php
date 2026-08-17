@@ -67,7 +67,7 @@ use function str_contains;
  * @method static QueryBuilderInterface leftJoin(...$arguments) Left join
  * @method static QueryBuilderInterface leftJoinLateral(...$arguments) Left join lateral
  * @method static QueryBuilderInterface leftOuterJoin(...$arguments) Left outer join
- * @method static QueryBuilderInterface limit(int $limit, int $offset = 0) Limit
+ * @method static QueryBuilderInterface limit(int $limit, ?int $offset = null) Limit
  * @method static QueryBuilderInterface naturalJoin(...$arguments) Natural join
  * @method static QueryBuilderInterface naturalLeftOuterJoin(...$arguments) Natural left outer join
  * @method static QueryBuilderInterface naturalRightOuterJoin(...$arguments) Natural right outer join
@@ -136,7 +136,7 @@ use function str_contains;
  * @method QueryBuilderInterface leftJoin(...$arguments) Left join
  * @method QueryBuilderInterface leftJoinLateral(...$arguments) Left join lateral
  * @method QueryBuilderInterface leftOuterJoin(...$arguments) Left outer join
- * @method QueryBuilderInterface limit(int $limit, int $offset = 0) Limit
+ * @method QueryBuilderInterface limit(int $limit, ?int $offset = null) Limit
  * @method QueryBuilderInterface naturalJoin(...$arguments) Natural join
  * @method QueryBuilderInterface naturalLeftOuterJoin(...$arguments) Natural left outer join
  * @method QueryBuilderInterface naturalRightOuterJoin(...$arguments) Natural right outer join

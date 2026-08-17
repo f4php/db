@@ -84,13 +84,13 @@ class DBTransaction
             return array_map(
                 callback: function (QueryBuilderInterface $query): mixed {
                     $preparedStatement = $query->getPreparedStatement($this->adapter->enumerateParameters(...));
-                    return $this->adapter->execute(statement: $preparedStatement);
+                    return $this->adapter->execute($preparedStatement);
                 },
                 array: $this->getQueries(),
             );
         } catch (Throwable $e) {
             $query = DB::raw('ROLLBACK');
-            $this->adapter->execute(statement: $query->getPreparedStatement());
+            $this->adapter->execute($query->getPreparedStatement());
             throw $e;
         }
     }

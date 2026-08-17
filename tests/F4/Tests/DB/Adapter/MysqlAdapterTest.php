@@ -66,6 +66,97 @@ final class MysqlAdapterTest extends TestCase
         );
     }
 
+    public function testGeneratedConnectionStringRoundTripsEscapedMultibyteValues(): void
+    {
+        $adapter = new TestableMysqlAdapter();
+        $connectionString = TestableMysqlAdapter::exposeBuildConnectionString(
+            'db.例.test',
+            '3306',
+            "данные'📦",
+            '用戶\\admin',
+            "päss'\\秘密🙂",
+            'UTF8',
+        );
+
+        $this->assertSame(
+            "host='db.例.test' port='3306' dbname='данные\\'📦' user='用戶\\\\admin' password='päss\\'\\\\秘密🙂'",
+            $connectionString,
+        );
+        $this->assertSame(
+            [
+                'host' => 'db.例.test',
+                'port' => 3306,
+                'database' => "данные'📦",
+                'username' => '用戶\\admin',
+                'password' => "päss'\\秘密🙂",
+                'charset' => 'UTF8',
+                'socket' => null,
+            ],
+            $adapter->exposeConnectionOptions($connectionString),
+        );
+    }
+
+    public function testParsesEscapedDoubleQuotedValue(): void
+    {
+        $adapter = new TestableMysqlAdapter();
+
+        $options = $adapter->exposeConnectionOptions(
+            'host="db.example.com" password="say \\"hello\\" at C:\\\\data"',
+        );
+
+        $this->assertSame('say "hello" at C:\\data', $options['password']);
+    }
+
+    public function testRejectsTrailingDataAfterQuotedValue(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        (new TestableMysqlAdapter())->exposeConnectionOptions(
+            "host='localhost' password='secret'word'",
+        );
+    }
+
+    public function testConnectionStringEscapingPreservesShiftJisTrailByte(): void
+    {
+        // The Shift-JIS representation of 表 ends in byte 0x5C, the ASCII backslash byte.
+        $multibyteCharacter = mb_convert_encoding('表', 'SJIS', 'UTF-8');
+        $value = $multibyteCharacter . "\\'";
+        $connectionString = "password='"
+            . TestableMysqlAdapter::exposeEscapeConnectionStringValue($value, 'SJIS')
+            . "'";
+
+        $this->assertSame(
+            $value,
+            TestableMysqlAdapter::exposeParseConnectionString($connectionString, 'SJIS')['password'],
+        );
+    }
+
+    public function testEscapedUnixSocketRoundTripsWithoutPort(): void
+    {
+        $adapter = new TestableMysqlAdapter();
+        $connectionString = TestableMysqlAdapter::exposeBuildConnectionString(
+            "/var/run/mysql'sock",
+            '3306',
+            'app',
+            'user',
+            'secret',
+            'UTF8',
+        );
+
+        $this->assertSame(
+            "host='/var/run/mysql\\'sock' dbname='app' user='user' password='secret'",
+            $connectionString,
+        );
+        $this->assertSame('/var/run/mysql\'sock', $adapter->exposeConnectionOptions($connectionString)['socket']);
+    }
+
+    public function testRejectsConnectionStringInvalidForConfiguredEncoding(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        TestableMysqlAdapter::exposeParseConnectionString("password='invalid_\xFF'", 'UTF8');
+    }
+
     public function testRejectsUnsupportedConnectionUrl(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -182,6 +273,28 @@ final class TestableMysqlAdapter extends MysqlAdapter
     public function exposeConnectionOptions(string $connectionString): array
     {
         return $this->resolveConnectionOptions($connectionString);
+    }
+
+    public static function exposeBuildConnectionString(
+        string $host,
+        string $port,
+        string $database,
+        string $username,
+        string $password,
+        string $encoding,
+    ): string {
+        return parent::buildConnectionString($host, $port, $database, $username, $password, $encoding);
+    }
+
+    public static function exposeEscapeConnectionStringValue(string $value, string $encoding): string
+    {
+        return parent::escapeConnectionStringValue($value, $encoding);
+    }
+
+    /** @return array<string, string> */
+    public static function exposeParseConnectionString(string $value, string $encoding): array
+    {
+        return parent::parseConnectionString($value, $encoding);
     }
 
     public function exposeNormalizeParameter(mixed $value): mixed

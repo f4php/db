@@ -62,7 +62,7 @@ interface QueryBuilderInterface extends FragmentCollectionInterface, FragmentInt
     public function leftJoin(...$arguments): static;
     public function leftJoinLateral(...$arguments): static;
     public function leftOuterJoin(...$arguments): static;
-    public function limit(int $limit, int $offset = 0): static;
+    public function limit(int $limit, ?int $offset = null): static;
     public function naturalJoin(...$arguments): static;
     public function naturalLeftOuterJoin(...$arguments): static;
     public function naturalRightOuterJoin(...$arguments): static;

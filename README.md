@@ -146,6 +146,13 @@ $rows = DB::select()
     ->asTable();
 ```
 
+Inside a quoted MySQL connection-string value, escape the active quote and a
+literal backslash with `\` (for example, `password='can\'t\\stop'`). Single- and
+double-quoted values are supported. Parsing is strict: unterminated values and
+non-whitespace text after a closing quote are rejected instead of being
+partially interpreted as connection options. Generated strings apply these
+rules automatically using `DB_CHARSET` so multibyte characters remain intact.
+
 `DB_CHARSET` is applied with `mysqli::set_charset()`, `TIMEZONE` is applied as the session `time_zone`, and `DB_PERSIST` controls the `mysqli` persistent-host prefix. `DB_SCHEMA` and `DB_APP_NAME` are not used by `MysqlAdapter`.
 
 #### Optional-adapter SQL compatibility
@@ -260,13 +267,18 @@ DB introduces a custom (non-standard) placeholder syntax that allows substitutio
 
 Three placeholder types are supported:
 
-`{#}` for a scalar value
+`{#}` for a scalar, `null`, or `DateTimeInterface` value
 
-`{#,...#}` for an array
+`{#,...#}` for an array of scalar, `null`, or `DateTimeInterface` values
 
 `{#::#}` for a DB Query Builder object instance
 
 These placeholders are internal builder syntax. At preparation time, the active adapter converts scalar placeholders to `$1`, `$2`, … for PostgreSQL or positional `?` parameters for SQLite and MySQL.
+
+PostgreSQL normalizes `DateTimeInterface` values as `Y-m-d\TH:i:s.uP`, preserving
+the timezone offset and six-digit microseconds. Unsupported objects are rejected
+when the fragment is constructed, including objects nested inside a comma
+placeholder array.
 
 Refer to the Usage Examples section below for practical demonstration.
 
@@ -425,6 +437,31 @@ DB::withRecursive([
     ->orderBy('level', 'name')
     ->asTable();
 ```
+
+### ORDER BY Identifiers and SQL Expressions
+
+`orderBy()` follows the same two parsing modes as other query clauses. Lone
+column identifiers are escaped through the active adapter; custom SQL strings
+are used as-is:
+
+```php
+// Recognized identifiers are escaped: ORDER BY "level", "user"."name"
+DB::select()->from('user')->orderBy('level', 'user.name');
+
+// The associative direction form also escapes its identifier
+DB::select()->from('user')->orderBy(['created_at' => 'DESC']);
+
+// Other strings are trusted SQL and remain unchanged
+DB::select()->from('user')->orderBy('"created_at" DESC NULLS LAST');
+
+// Bind values in custom SQL templates; do not interpolate untrusted values
+DB::select()->from('user')->orderBy([
+    'CASE WHEN "priority" = {#} THEN 0 ELSE 1 END' => 'high',
+]);
+```
+
+Custom SQL strings are developer-authored templates. Only their placeholder
+values should contain untrusted input.
 
 ### Subqueries with `{#::#}` Placeholder
 

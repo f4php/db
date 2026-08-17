@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace F4\DB\Adapter;
 
-use Composer\Pcre\Preg;
 use Closure,
     DateTimeInterface,
     InvalidArgumentException,
@@ -32,17 +31,27 @@ use F4\DB\PreparedStatement;
 
 use function
     array_fill,
+    array_map,
     bin2hex,
     count,
+    implode,
+    in_array,
     is_bool,
     is_float,
     is_int,
     is_string,
     json_decode,
+    mb_check_encoding,
+    mb_list_encodings,
+    mb_str_split,
+    ord,
     sprintf,
     str_contains,
     str_replace,
+    str_split,
     str_starts_with,
+    strtolower,
+    strtoupper,
     trim;
 
 /**
@@ -57,6 +66,24 @@ use function
  */
 class MysqlAdapter implements AdapterInterface
 {
+    private const array MBSTRING_ENCODING_MAP = [
+        'UTF8' => 'UTF-8',
+        'UTF8MB3' => 'UTF-8',
+        'UTF8MB4' => 'UTF-8',
+        'LATIN1' => 'ISO-8859-1',
+        'LATIN2' => 'ISO-8859-2',
+        'ASCII' => 'ASCII',
+        'CP1250' => 'Windows-1250',
+        'CP1251' => 'Windows-1251',
+        'SJIS' => 'SJIS',
+        'CP932' => 'SJIS-win',
+        'BIG5' => 'BIG-5',
+        'GBK' => 'CP936',
+        'EUCKR' => 'EUC-KR',
+        'UJIS' => 'EUC-JP',
+        'EUCJPMS' => 'EUC-JP',
+    ];
+
     protected mysqli $connection {
         get => $this->connection ?? ($this->connection = $this->connect(
             connectionString: $this->connectionString,
@@ -77,28 +104,63 @@ class MysqlAdapter implements AdapterInterface
     ) {
         $this->connectionString = match (!empty($connectionString)) {
             true => $connectionString,
-            default => match (str_starts_with(trim(Config::DB_HOST), '/')) {
-                true => sprintf(
-                    "host='%s' dbname='%s' user='%s' password='%s'",
-                    Config::DB_HOST,
-                    Config::DB_NAME,
-                    Config::DB_USERNAME,
-                    Config::DB_PASSWORD,
-                ),
-                default => sprintf(
-                    "host='%s' port='%s' dbname='%s' user='%s' password='%s'",
-                    Config::DB_HOST,
-                    Config::DB_PORT,
-                    Config::DB_NAME,
-                    Config::DB_USERNAME,
-                    Config::DB_PASSWORD,
-                ),
-            },
+            default => self::buildConnectionString(
+                Config::DB_HOST,
+                Config::DB_PORT,
+                Config::DB_NAME,
+                Config::DB_USERNAME,
+                Config::DB_PASSWORD,
+                Config::DB_CHARSET,
+            ),
         };
         $this->connectionFlags = $connectionFlags;
         $this->resultConverter = $resultConverter === null
             ? null
             : Closure::fromCallable($resultConverter);
+    }
+
+    protected static function buildConnectionString(
+        string $host,
+        string $port,
+        string $database,
+        string $username,
+        string $password,
+        string $encoding,
+    ): string {
+        $isSocket = str_starts_with(trim($host), '/');
+        $host = self::escapeConnectionStringValue($host, $encoding);
+        $database = self::escapeConnectionStringValue($database, $encoding);
+        $username = self::escapeConnectionStringValue($username, $encoding);
+        $password = self::escapeConnectionStringValue($password, $encoding);
+
+        return match ($isSocket) {
+            true => sprintf(
+                "host='%s' dbname='%s' user='%s' password='%s'",
+                $host,
+                $database,
+                $username,
+                $password,
+            ),
+            default => sprintf(
+                "host='%s' port='%s' dbname='%s' user='%s' password='%s'",
+                $host,
+                self::escapeConnectionStringValue($port, $encoding),
+                $database,
+                $username,
+                $password,
+            ),
+        };
+    }
+
+    protected static function escapeConnectionStringValue(string $value, string $encoding): string
+    {
+        return implode('', array_map(
+            static fn (string $character): string => match ($character) {
+                '\\', "'" => '\\' . $character,
+                default => $character,
+            },
+            self::splitConnectionStringCharacters($value, $encoding),
+        ));
     }
 
     public function connect(string $connectionString, int $connectionFlags = 0): mysqli
@@ -110,7 +172,7 @@ class MysqlAdapter implements AdapterInterface
             if (!$connection instanceof mysqli) {
                 throw new DatabaseException('Failed to initialize mysqli', 500);
             }
-            $connection->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, true);
+            $connection->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, 1);
 
             $host = Config::DB_PERSIST
                 ? 'p:' . $options['host']
@@ -166,23 +228,7 @@ class MysqlAdapter implements AdapterInterface
      */
     protected function resolveConnectionOptions(string $connectionString): array
     {
-        $matches = [];
-        $matchCount = Preg::matchAll(
-            pattern: '/([a-z_]+)\s*=\s*(?:\'([^\']*)\'|"([^"]*)"|(\S+))/i',
-            subject: $connectionString,
-            matches: $matches,
-        );
-        if ($matchCount === 0) {
-            throw new InvalidArgumentException('Invalid MySQL connection string');
-        }
-
-        $values = [];
-        for ($index = 0; $index < $matchCount; $index++) {
-            $values[$matches[1][$index]] = $matches[2][$index]
-                ?? $matches[3][$index]
-                ?? $matches[4][$index]
-                ?? '';
-        }
+        $values = self::parseConnectionString($connectionString, Config::DB_CHARSET);
 
         $configuredHost = $values['host'] ?? Config::DB_HOST;
         $socket = $values['socket'] ?? (
@@ -200,6 +246,121 @@ class MysqlAdapter implements AdapterInterface
             'charset' => $values['charset'] ?? (Config::DB_CHARSET !== '' ? Config::DB_CHARSET : 'utf8mb4'),
             'socket' => $socket,
         ];
+    }
+
+    /** @return array<string, string> */
+    protected static function parseConnectionString(string $connectionString, string $encoding): array
+    {
+        $characters = self::splitConnectionStringCharacters($connectionString, $encoding);
+        $length = count($characters);
+        $index = 0;
+        $values = [];
+
+        while (true) {
+            while ($index < $length && self::isConnectionStringWhitespace($characters[$index])) {
+                $index++;
+            }
+            if ($index === $length) {
+                break;
+            }
+
+            $key = '';
+            while ($index < $length && self::isConnectionStringKeyCharacter($characters[$index])) {
+                $key .= $characters[$index++];
+            }
+            if ($key === '') {
+                throw new InvalidArgumentException('Invalid MySQL connection string key');
+            }
+
+            while ($index < $length && self::isConnectionStringWhitespace($characters[$index])) {
+                $index++;
+            }
+            if (($characters[$index] ?? null) !== '=') {
+                throw new InvalidArgumentException('Invalid MySQL connection string assignment');
+            }
+            $index++;
+
+            while ($index < $length && self::isConnectionStringWhitespace($characters[$index])) {
+                $index++;
+            }
+            if ($index === $length) {
+                throw new InvalidArgumentException('Missing MySQL connection string value');
+            }
+
+            $value = '';
+            $quote = in_array($characters[$index], ["'", '"'], true)
+                ? $characters[$index++]
+                : null;
+            if ($quote !== null) {
+                $closed = false;
+                while ($index < $length) {
+                    $character = $characters[$index++];
+                    if ($character === $quote) {
+                        $closed = true;
+                        break;
+                    }
+                    if (
+                        $character === '\\'
+                        && $index < $length
+                        && in_array($characters[$index], ['\\', $quote], true)
+                    ) {
+                        $value .= $characters[$index++];
+                        continue;
+                    }
+                    $value .= $character;
+                }
+                if (!$closed) {
+                    throw new InvalidArgumentException('Unterminated MySQL connection string value');
+                }
+                if ($index < $length && !self::isConnectionStringWhitespace($characters[$index])) {
+                    throw new InvalidArgumentException('Unexpected data after MySQL connection string value');
+                }
+            } else {
+                while ($index < $length && !self::isConnectionStringWhitespace($characters[$index])) {
+                    $value .= $characters[$index++];
+                }
+            }
+
+            $values[strtolower($key)] = $value;
+        }
+
+        if ($values === []) {
+            throw new InvalidArgumentException('Invalid MySQL connection string');
+        }
+        return $values;
+    }
+
+    /** @return list<string> */
+    private static function splitConnectionStringCharacters(string $value, string $encoding): array
+    {
+        $mbEncoding = self::MBSTRING_ENCODING_MAP[strtoupper($encoding)] ?? null;
+        if ($mbEncoding === null || !self::isSupportedMbEncoding($mbEncoding)) {
+            return str_split($value);
+        }
+        if (!mb_check_encoding($value, $mbEncoding)) {
+            throw new InvalidArgumentException(sprintf('MySQL connection value is not valid %s', $encoding));
+        }
+        return mb_str_split($value, 1, $mbEncoding);
+    }
+
+    private static function isConnectionStringWhitespace(string $character): bool
+    {
+        return in_array($character, [" ", "\t", "\r", "\n", "\v", "\f"], true);
+    }
+
+    private static function isConnectionStringKeyCharacter(string $character): bool
+    {
+        $byte = ord($character);
+        return $character === '_'
+            || ($byte >= 65 && $byte <= 90)
+            || ($byte >= 97 && $byte <= 122);
+    }
+
+    private static function isSupportedMbEncoding(string $encoding): bool
+    {
+        static $supported = null;
+        $supported ??= array_map(strtoupper(...), mb_list_encodings());
+        return in_array(strtoupper($encoding), $supported, true);
     }
 
     public function execute(PreparedStatement $statement, ?int $stopAfter = null): array

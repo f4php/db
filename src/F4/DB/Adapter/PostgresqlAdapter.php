@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace F4\DB\Adapter;
 
 use Composer\Pcre\Preg;
-use DateTime,
+use DateTimeInterface,
     ErrorException,
     InvalidArgumentException,
     Throwable;
@@ -14,11 +14,14 @@ use F4\DB\Adapter\AdapterInterface;
 use F4\DB\Exception\{
     DuplicateColumnException,
     DuplicateFunctionException,
+    DuplicateObjectException,
     DuplicateRecordException,
     DuplicateSchemaException,
     DuplicateTableException,
     Exception,
+    InvalidResultValueException,
     InvalidTableDefinitionException,
+    InvalidTextRepresentationException,
     ParameterMismatchException,
     SyntaxErrorException,
     UnknownColumnException,
@@ -35,6 +38,7 @@ use PgSql\{
 use function
     array_map,
     count,
+    implode,
     in_array,
     is_array,
     is_bool,
@@ -44,8 +48,7 @@ use function
     json_decode,
     mb_check_encoding,
     mb_list_encodings,
-    mb_substr,
-    mb_trim,
+    mb_str_split,
     pg_escape_bytea,
     pg_escape_literal,
     pg_fetch_row,
@@ -63,6 +66,9 @@ use function
     pg_unescape_bytea,
     sprintf,
     str_contains,
+    str_replace,
+    str_starts_with,
+    trim,
     strtoupper;
 
 /**
@@ -108,12 +114,65 @@ class PostgresqlAdapter implements AdapterInterface
     {
         $this->connectionString = match (!empty($connectionString)) {
             true => $connectionString,
-            default => match (mb_substr(mb_trim(Config::DB_HOST), 0, 1) === '/') {
-                    true => sprintf("host='%s' dbname='%s' user='%s' password='%s'", Config::DB_HOST, Config::DB_NAME, Config::DB_USERNAME, Config::DB_PASSWORD),
-                    default => sprintf("host='%s' port='%s' dbname='%s' user='%s' password='%s'", Config::DB_HOST, Config::DB_PORT, Config::DB_NAME, Config::DB_USERNAME, Config::DB_PASSWORD)
-                }
+            default => self::buildConnectionString(
+                Config::DB_HOST,
+                Config::DB_PORT,
+                Config::DB_NAME,
+                Config::DB_USERNAME,
+                Config::DB_PASSWORD,
+                Config::DB_CHARSET,
+            ),
         };
         $this->connectionFlags = $connectionFlags;
+    }
+    protected static function buildConnectionString(
+        string $host,
+        string $port,
+        string $database,
+        string $username,
+        string $password,
+        string $encoding,
+    ): string {
+        $host = self::escapeConnectionStringValue($host, $encoding);
+        $database = self::escapeConnectionStringValue($database, $encoding);
+        $username = self::escapeConnectionStringValue($username, $encoding);
+        $password = self::escapeConnectionStringValue($password, $encoding);
+
+        return match (str_starts_with(trim($host), '/')) {
+            true => sprintf(
+                "host='%s' dbname='%s' user='%s' password='%s'",
+                $host,
+                $database,
+                $username,
+                $password,
+            ),
+            default => sprintf(
+                "host='%s' port='%s' dbname='%s' user='%s' password='%s'",
+                $host,
+                self::escapeConnectionStringValue($port, $encoding),
+                $database,
+                $username,
+                $password,
+            ),
+        };
+    }
+    protected static function escapeConnectionStringValue(string $value, string $encoding): string
+    {
+        $mbEncoding = self::MBSTRING_ENCODING_MAP[strtoupper($encoding)] ?? null;
+        if ($mbEncoding === null || !self::isSupportedMbEncoding($mbEncoding)) {
+            return str_replace(['\\', "'"], ['\\\\', "\\'"], $value);
+        }
+        if (!mb_check_encoding($value, $mbEncoding)) {
+            throw new InvalidArgumentException(sprintf('PostgreSQL connection value is not valid %s', $encoding));
+        }
+
+        return implode('', array_map(
+            static fn (string $character): string => match ($character) {
+                '\\', "'" => '\\' . $character,
+                default => $character,
+            },
+            mb_str_split($value, 1, $mbEncoding),
+        ));
     }
     public function execute(PreparedStatement $statement, ?int $stopAfter = null): array
     {
@@ -123,10 +182,7 @@ class PostgresqlAdapter implements AdapterInterface
         $query = $statement->query;
         // PHP bools are cast to empty strings by default, which requires a workaround
         $parameters = array_map(
-            callback: fn ($parameter): mixed => match (is_bool($parameter)) {
-                true => $parameter ? 'true' : 'false',
-                default => $parameter
-            },
+            callback: self::normalizeParameter(...),
             array: $statement->parameters
         );
         if (
@@ -178,6 +234,14 @@ class PostgresqlAdapter implements AdapterInterface
     {
         return sprintf('$%d', $index);
     }
+    protected static function normalizeParameter(mixed $parameter): mixed
+    {
+        return match (true) {
+            $parameter instanceof DateTimeInterface => $parameter->format('Y-m-d\TH:i:s.uP'),
+            is_bool($parameter) => $parameter ? 'true' : 'false',
+            default => $parameter,
+        };
+    }
     protected function castType(mixed $value, string $type): mixed
     {
         if (is_array($value)) {
@@ -202,6 +266,8 @@ class PostgresqlAdapter implements AdapterInterface
                     break;
                 case 'real':
                 case 'double precision':
+                case 'float4':
+                case 'float8':
                     $value = (float) $value;
                     break;
                 case 'numeric':
@@ -216,7 +282,7 @@ class PostgresqlAdapter implements AdapterInterface
                     $value = match ($value) {
                         't' => true,
                         'f' => false,
-                        default => null
+                        default => throw new InvalidResultValueException('Unexpected PostgreSQL boolean representation'),
                     };
                     break;
                 case 'bytea':
@@ -236,7 +302,8 @@ class PostgresqlAdapter implements AdapterInterface
     {
         return match ($code) {
             '08P01' => new ParameterMismatchException(message: $message),
-            '22P02', '42601' => new SyntaxErrorException(message: $message),
+            '22P02' => new InvalidTextRepresentationException(message: $message),
+            '42601' => new SyntaxErrorException(message: $message),
             '23505' => new DuplicateRecordException(message: $message),
             '42703' => new UnknownColumnException(message: $message),
             '42723' => new DuplicateFunctionException(message: $message),
@@ -244,7 +311,8 @@ class PostgresqlAdapter implements AdapterInterface
             '42P01' => new UnknownTableException(message: $message),
             '42P06' => new DuplicateSchemaException(message: $message),
             '42P07' => new DuplicateTableException(message: $message),
-            '42710', '42701' => new DuplicateColumnException(message: $message),
+            '42710' => new DuplicateObjectException(message: $message),
+            '42701' => new DuplicateColumnException(message: $message),
             '42P16' => new InvalidTableDefinitionException(message: $message),
             default => new Exception(message: sprintf("Database error %s, %s", $code, $message))
         };
@@ -272,13 +340,13 @@ class PostgresqlAdapter implements AdapterInterface
             if (pg_set_client_encoding(connection: $connection, encoding: Config::DB_CHARSET) !== 0) {
                 throw new ErrorException(message: "failed-to-set-database-encoding", code: 500);
             }
-            if (Config::TIMEZONE && !@pg_query(connection: $connection, query: sprintf('SET TIME ZONE %s', pg_escape_literal($connection, Config::TIMEZONE)))) {
+            if (Config::TIMEZONE && !@pg_query(connection: $connection, query: sprintf('SET TIME ZONE %s', self::requireEscapedLiteral(pg_escape_literal($connection, Config::TIMEZONE))))) {
                 throw new ErrorException('Failed to set database timezone', 500);
             }
-            if (Config::DB_SCHEMA && !@pg_query(connection: $connection, query: sprintf('SET "search_path" TO %s', pg_escape_literal($connection, Config::DB_SCHEMA)))) {
+            if (Config::DB_SCHEMA && !@pg_query(connection: $connection, query: sprintf('SET "search_path" TO %s', self::requireEscapedLiteral(pg_escape_literal($connection, Config::DB_SCHEMA))))) {
                 throw new ErrorException('Failed to set database schema', 500);
             }
-            if (Config::DB_APP_NAME && !@pg_query(connection: $connection, query: sprintf('SET "application_name" = %s', pg_escape_literal($connection, Config::DB_APP_NAME)))) {
+            if (Config::DB_APP_NAME && !@pg_query(connection: $connection, query: sprintf('SET "application_name" = %s', self::requireEscapedLiteral(pg_escape_literal($connection, Config::DB_APP_NAME))))) {
                 throw new ErrorException('Failed to set database application name', 500);
             }
         } catch (ErrorException $e) {
@@ -300,16 +368,23 @@ class PostgresqlAdapter implements AdapterInterface
                     true => $value ? 'TRUE' : 'FALSE',
                     default => match (is_int($value) || is_float($value)) {
                             true => (string) $value,
-                            default => match ($value instanceof DateTime) {
-                                    true => $value->format('Y-m-d H:i:s'),
+                            default => match ($value instanceof DateTimeInterface) {
+                                    true => self::requireEscapedLiteral(pg_escape_literal($this->connection, $value->format('Y-m-d\TH:i:s.uP'))),
                                     default => match (is_scalar($value)) {
-                                            true => pg_escape_literal($this->connection, (string) $value),
+                                            true => self::requireEscapedLiteral(pg_escape_literal($this->connection, (string) $value)),
                                             default => throw new InvalidArgumentException('Unsupported parameter type')
                                         }
                                 }
                         }
                 }
         };
+    }
+    protected static function requireEscapedLiteral(string|false $escapedLiteral): string
+    {
+        if ($escapedLiteral === false) {
+            throw new ErrorException('Failed to escape PostgreSQL literal', 500);
+        }
+        return $escapedLiteral;
     }
     public function getEscapedBinary(string $value): string
     {

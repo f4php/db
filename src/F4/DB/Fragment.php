@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace F4\DB;
 
 use Composer\Pcre\Preg;
+use DateTimeInterface;
 use InvalidArgumentException;
 use F4\DB\{
     FragmentInterface,
@@ -151,10 +152,10 @@ class Fragment implements FragmentInterface
             throw new InvalidArgumentException('Parameter mismatch, expected: ' . count($patterns) . ', received: ' . count($parameters));
         }
         foreach ($patterns as $index => $pattern) {
-            if (($pattern === self::SINGLE_PARAMETER_PLACEHOLDER) && (!array_key_exists($index, $parameters) || (!is_scalar($parameters[$index]) && $parameters[$index] !== null))) {
-                throw new InvalidArgumentException('Only scalars are supported for ' . self::SINGLE_PARAMETER_PLACEHOLDER);
-            } else if (($pattern === self::COMMA_PARAMETER_PLACEHOLDER) && (!array_key_exists($index, $parameters) || !is_array($parameters[$index]))) {
-                throw new InvalidArgumentException('Only arrays are supported for ' . self::COMMA_PARAMETER_PLACEHOLDER);
+            if (($pattern === self::SINGLE_PARAMETER_PLACEHOLDER) && (!array_key_exists($index, $parameters) || !self::isBindableValue($parameters[$index]))) {
+                throw new InvalidArgumentException('Only scalar, null, or DateTimeInterface values are supported for ' . self::SINGLE_PARAMETER_PLACEHOLDER);
+            } else if (($pattern === self::COMMA_PARAMETER_PLACEHOLDER) && (!array_key_exists($index, $parameters) || !self::isBindableValueList($parameters[$index]))) {
+                throw new InvalidArgumentException('Only arrays of scalar, null, or DateTimeInterface values are supported for ' . self::COMMA_PARAMETER_PLACEHOLDER);
             } else if (($pattern === self::SUBQUERY_PARAMETER_PLACEHOLDER) && (!array_key_exists($index, $parameters) || !($parameters[$index] instanceof FragmentInterface))) {
                 throw new InvalidArgumentException('Only DB objects are supported for ' . self::SUBQUERY_PARAMETER_PLACEHOLDER);
             }
@@ -162,6 +163,22 @@ class Fragment implements FragmentInterface
         $this->query = $query;
         $this->parameters = $parameters;
         return $this;
+    }
+    protected static function isBindableValue(mixed $value): bool
+    {
+        return $value === null || is_scalar($value) || $value instanceof DateTimeInterface;
+    }
+    protected static function isBindableValueList(mixed $values): bool
+    {
+        if (!is_array($values)) {
+            return false;
+        }
+        foreach ($values as $value) {
+            if (!self::isBindableValue($value)) {
+                return false;
+            }
+        }
+        return true;
     }
     public function withPrefix(string $prefix): static
     {
