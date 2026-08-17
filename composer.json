@@ -35,6 +35,9 @@
         "composer/pcre": "^3.3",
         "f4php/hookmanager": "^0.0.2"
     },
+    "suggest": {
+        "ext-sqlite3": "Required to use SqliteAdapter"
+    },
     "require-dev": {
         "phpunit/phpunit": "^12",
         "phpstan/phpstan": "^2.0",

@@ -60,7 +60,7 @@ class Config {
     public const string DB_PORT = '5432';
     public const string DB_NAME = '';
     public const string DB_USERNAME = '';
-    #[SensitiveParameter]
+    #[\SensitiveParameter]
     public const string DB_PASSWORD = '';
     public const string DB_SCHEMA = '';
     public const ?string DB_APP_NAME = null;
@@ -69,11 +69,28 @@ class Config {
 }
 ```
 
+### Database Adapters
+
+The active adapter is selected via `DB_ADAPTER_CLASS` (or by passing an adapter to a builder at runtime via `useAdapter()`). Two adapters ship with the package:
+
+- **`\F4\DB\Adapter\PostgresqlAdapter`** (default) — uses the `pgsql` extension. Prepared-statement placeholders are enumerated as `$1, $2, …`.
+- **`\F4\DB\Adapter\SqliteAdapter`** — uses the native `SQLite3` extension (`ext-sqlite3`, listed under `suggest`). Placeholders are enumerated as `?`. `DB_NAME` is the database filename (use `":memory:"` for an in-memory database).
+
+```php
+class Config {
+    // ...
+    public const string DB_NAME = '/var/data/app.sqlite'; // or ':memory:'
+    public const string DB_ADAPTER_CLASS = \F4\DB\Adapter\SqliteAdapter::class;
+}
+```
+
+`SqliteAdapter` accepts an optional result-converter callback (constructor argument) or can be subclassed to override `convertResultValue()` — SQLite exposes storage classes rather than declared column types, so mapping by output alias is recommended. Identifier quoting on both adapters is connectionless (no database connection is opened merely to build or render a query).
+
 ## Key Concepts
 
 DB aims to replicate SQL syntax using native PHP expressions as closely as possible.
 
-It is primarily focused on PostgreSQL syntax and has not been tested with other DBMSs. However, its adapter-based architecture enables support for other database engines.
+It is primarily focused on PostgreSQL syntax. Its adapter-based architecture enables support for other database engines: a **PostgreSQL** adapter and a **SQLite** adapter (backed by the native `SQLite3` extension) are provided out of the box. Identifiers are quoted by the *active* adapter at query-render time, so the same query builder produces adapter-appropriate SQL.
 
 DB currently supports a significant but still limited subset of SQL syntax, which is gradually expanding as new features are added.
 
@@ -415,9 +432,11 @@ After building a query, the following tail methods are available for fetching re
 
 ## Data Types
 
-DB attempts to cast returned values to appropriate PHP types, but since PHP and DBMS type systems are not fully compatible, some inconsistencies may occur.
+DB attempts to cast returned values to appropriate PHP types, but since PHP and DBMS type systems are not fully compatible, some inconsistencies may occur. Type conversion is adapter-specific.
 
-The PostgreSQL adapter automatically applies the following casting rules:
+The **SQLite adapter** returns values in SQLite's native storage classes by default; supply a result-converter callback to the `SqliteAdapter` constructor (or override `convertResultValue()`) to map values to application types.
+
+The **PostgreSQL adapter** automatically applies the following casting rules:
 
 ```php
   switch ($type) {

@@ -1,6 +1,6 @@
 # DB Query Builder - Agent Guide
 
-DB is a database query builder for PostgreSQL with a fluent PHP interface that closely mirrors SQL syntax. This guide helps AI agents understand and work with the codebase effectively.
+DB is a database query builder with a fluent PHP interface that closely mirrors SQL syntax. It is primarily focused on PostgreSQL but ships with both a PostgreSQL and a SQLite adapter. This guide helps AI agents understand and work with the codebase effectively.
 
 ## Architecture Overview
 
@@ -9,14 +9,17 @@ DB is a database query builder for PostgreSQL with a fluent PHP interface that c
 - **DB** ([src/F4/DB.php](src/F4/DB.php)) - Main entry point supporting both static and instance method calls
 - **QueryBuilder** ([src/F4/DB/QueryBuilder.php](src/F4/DB/QueryBuilder.php)) - Core query building logic, extends FragmentCollection
 - **Fragment** ([src/F4/DB/Fragment.php](src/F4/DB/Fragment.php)) - Base class for SQL query fragments with parameter substitution
-- **Adapters** ([src/F4/DB/Adapter/](src/F4/DB/Adapter/)) - Database-specific implementations (currently PostgreSQL)
+- **Adapters** ([src/F4/DB/Adapter/](src/F4/DB/Adapter/)) - Database-specific implementations: `PostgresqlAdapter` (default, `pgsql` ext) and `SqliteAdapter` (`SQLite3` ext)
+- **DelimitedIdentifier** ([src/F4/DB/DelimitedIdentifier.php](src/F4/DB/DelimitedIdentifier.php)) - A `Fragment` holding a single identifier that quotes itself via the active adapter at render time
+- **Reference types** ([src/F4/DB/Reference/](src/F4/DB/Reference/)) - Parse identifier strings (`table`, `t.col`, `col alias`) into `DelimitedIdentifier`s; extend `Fragment`
 - **Collections** - Specialized fragment collections for different SQL clauses (WHERE, SELECT, JOIN, etc.)
 
 ### Key Abstractions
 
-- `FragmentInterface` - Base interface for all SQL fragments
+- `FragmentInterface` - Base interface for all SQL fragments; `getQuery()`/`getPreparedStatement()` accept an optional `?AdapterInterface $adapter` threaded at render time
 - `FragmentCollectionInterface` - Interface for collections of fragments
 - `QueryBuilderInterface` - Interface defining all query builder methods
+- `AdapterInterface` - Database-specific escaping/execution; `getEscapedIdentifier()` must be connectionless
 
 ## Placeholder System
 
@@ -25,6 +28,8 @@ DB uses a custom placeholder syntax for parameter binding:
 - `{#}` - Single scalar value (string, int, float, bool, null)
 - `{#,...#}` - Array of values (expands to comma-separated placeholders)
 - `{#::#}` - Subquery (accepts DB/Fragment objects)
+
+The final prepared-statement placeholder form is adapter-specific: PostgreSQL enumerates as `$1, $2, …`, SQLite as `?`. Examples below show the PostgreSQL form.
 
 ### Placeholder Examples
 
@@ -290,15 +295,21 @@ class Config {
 }
 ```
 
+Select the adapter via `DB_ADAPTER_CLASS` (or at runtime via `useAdapter()`). For SQLite, set `DB_ADAPTER_CLASS = \F4\DB\Adapter\SqliteAdapter::class` and use `DB_NAME` as the database filename (`":memory:"` for in-memory). Tests run against `MockAdapter` regardless of this setting.
+
 ## Type Casting
 
-PostgreSQL adapter automatically casts database types to PHP types:
+Type conversion is adapter-specific.
+
+The **PostgreSQL adapter** automatically casts database types to PHP types:
 
 - `smallint`, `integer`, `bigint`, `serial` → `int`
-- `real`, `double precision` → `float`
+- `real`, `double precision`, `float4`, `float8` → `float`
 - `json`, `jsonb` → `array` (via `json_decode`)
 - `boolean` → `bool`
 - `numeric` → `string` (no automatic casting)
+
+The **SQLite adapter** returns SQLite storage-class values as-is by default. To convert, pass a result-converter callback `(mixed $value, string $columnName, int $columnIndex, int $sqliteType): mixed` to the `SqliteAdapter` constructor, or subclass and override `convertResultValue()`. Because SQLite exposes storage classes rather than declared types, mapping by output alias is recommended.
 
 ## Important Implementation Details
 
@@ -334,13 +345,15 @@ Different collection types handle different SQL clause structures:
 
 ### Identifier Quoting
 
-DB automatically quotes simple identifiers with double quotes per PostgreSQL convention:
+DB automatically quotes simple identifiers via the **active adapter at render time** (not at construction). Both bundled adapters use double quotes:
 
 - `users` → `"users"`
 - `users u` → `"users" AS "u"`
 - `schema.table` → `"schema"."table"`
 
-Raw expressions (numeric array keys or expressions with custom placeholders) bypass automatic quoting.
+Mechanism: reference strings are parsed into `DelimitedIdentifier`s (see [src/F4/DB/Reference/](src/F4/DB/Reference/)); a collection embeds a recognized reference via the `{#::#}` seam, which calls `getQuery($adapter)` at render time so the query's *current* adapter (honoring `useAdapter()` and transactions) performs the quoting. `AdapterInterface::getEscapedIdentifier()` is connectionless — building/rendering a query never opens a connection. `DB::escapeIdentifier()` returns a `DelimitedIdentifier` (string coercion is deprecated; use `getQuery()`).
+
+A reference string that is **not** a plain identifier — a numeric array key, or a key/expression containing a custom placeholder — is not recognized as an identifier (`getDelimited()` returns `null`) and bypasses automatic quoting, rendered raw by the collection instead.
 
 ## Anti-Patterns to Avoid
 
@@ -384,10 +397,12 @@ Raw expressions (numeric array keys or expressions with custom placeholders) byp
 - Entry point: [src/F4/DB.php](src/F4/DB.php)
 - Query builder: [src/F4/DB/QueryBuilder.php](src/F4/DB/QueryBuilder.php)
 - Fragment system: [src/F4/DB/Fragment.php](src/F4/DB/Fragment.php)
+- Delimited identifier: [src/F4/DB/DelimitedIdentifier.php](src/F4/DB/DelimitedIdentifier.php)
 - Collections: [src/F4/DB/](src/F4/DB/) (*Collection.php files)
 - Reference types: [src/F4/DB/Reference/](src/F4/DB/Reference/)
 - Adapter interface: [src/F4/DB/Adapter/AdapterInterface.php](src/F4/DB/Adapter/AdapterInterface.php)
 - PostgreSQL adapter: [src/F4/DB/Adapter/PostgresqlAdapter.php](src/F4/DB/Adapter/PostgresqlAdapter.php)
+- SQLite adapter: [src/F4/DB/Adapter/SqliteAdapter.php](src/F4/DB/Adapter/SqliteAdapter.php)
 - Tests: [tests/F4/Tests/DBTest.php](tests/F4/Tests/DBTest.php)
 
 ## Not Yet Implemented
