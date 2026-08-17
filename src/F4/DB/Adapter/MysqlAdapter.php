@@ -30,8 +30,11 @@ use F4\DB\Exception\{
 use F4\DB\PreparedStatement;
 
 use function
+    array_count_values,
     array_fill,
+    array_find_key,
     array_map,
+    array_unique,
     bin2hex,
     count,
     implode,
@@ -398,6 +401,24 @@ class MysqlAdapter implements AdapterInterface
             }
 
             $fields = $metadata->fetch_fields();
+            $columnNames = [];
+            foreach ($fields as $field) {
+                $columnNames[] = $field->name;
+            }
+            if (
+                !Config::DB_OVERWRITE_DUPLICATE_RESPONSE_COLUMNS
+                && count($columnNames) !== count(array_unique($columnNames))
+            ) {
+                $columnName = array_find_key(
+                    array: array_count_values($columnNames),
+                    callback: static fn(int $count): bool => $count > 1,
+                );
+                throw new DuplicateColumnException(sprintf(
+                    'Duplicate result column name "%s"; alias duplicate columns in the query',
+                    $columnName,
+                ));
+            }
+
             $values = array_fill(0, count($fields), null);
             $valueReferences = [];
             foreach ($values as &$value) {

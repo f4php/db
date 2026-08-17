@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace F4\Tests\DB\Adapter;
 
+use F4\DB;
 use F4\DB\Adapter\SqliteAdapter;
 use F4\DB\Exception\{
+    DuplicateColumnException,
     DuplicateRecordException,
     ParameterMismatchException,
     UnknownTableException,
 };
 use F4\DB\PreparedStatement;
+use F4\DB\QueryBuilderInterface;
 use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 
@@ -50,6 +53,59 @@ final class SqliteAdapterTest extends TestCase
             [['id' => 1], ['id' => 2]],
             $adapter->execute(new PreparedStatement('SELECT id FROM items ORDER BY id', []), 2),
         );
+    }
+
+    public function testRejectsAndReportsFirstDuplicateResultColumnName(): void
+    {
+        $this->expectException(DuplicateColumnException::class);
+        $this->expectExceptionMessage('Duplicate result column name "first"');
+
+        $this->adapter()->execute(new PreparedStatement(
+            'SELECT 1 AS first, 2 AS second, 3 AS first, 4 AS second',
+            [],
+        ));
+    }
+
+    public function testRejectsDuplicateColumnNamesForEmptyResult(): void
+    {
+        $this->expectException(DuplicateColumnException::class);
+
+        $this->adapter()->execute(new PreparedStatement(
+            'SELECT 1 AS id, 2 AS id WHERE 0',
+            [],
+        ));
+    }
+
+    public function testReturnsDistinctResultColumnAliases(): void
+    {
+        $this->assertSame(
+            [['user_id' => 1, 'order_id' => 2]],
+            $this->adapter()->execute(new PreparedStatement(
+                'SELECT 1 AS user_id, 2 AS order_id',
+                [],
+            )),
+        );
+    }
+
+    public function testAsTableRejectsDuplicateResultColumnNames(): void
+    {
+        $this->expectException(DuplicateColumnException::class);
+
+        $this->duplicateResultQuery()->asTable();
+    }
+
+    public function testAsRowRejectsDuplicateResultColumnNames(): void
+    {
+        $this->expectException(DuplicateColumnException::class);
+
+        $this->duplicateResultQuery()->asRow();
+    }
+
+    public function testAsValueRejectsDuplicateResultColumnNames(): void
+    {
+        $this->expectException(DuplicateColumnException::class);
+
+        $this->duplicateResultQuery()->asValue();
     }
 
     public function testResultConverterReceivesColumnMetadata(): void
@@ -117,6 +173,11 @@ final class SqliteAdapterTest extends TestCase
     public function testUsesPositionalParameters(): void
     {
         $this->assertSame('?', $this->adapter()->enumerateParameters(42));
+    }
+
+    private function duplicateResultQuery(): QueryBuilderInterface
+    {
+        return DB::raw('SELECT 1 AS id, 2 AS id')->useAdapter($this->adapter());
     }
 }
 

@@ -19,7 +19,10 @@ final class RenamedParamsMockAdapter implements AdapterInterface
     /** @var list<array{query: string, parameters: array, limit: ?int}> */
     public array $executions = [];
 
-    public function __construct(private readonly ?string $failingQuery = null) {}
+    public function __construct(
+        private readonly ?string $failingQuery = null,
+        private readonly bool $failRollback = false,
+    ) {}
 
     public function execute(PreparedStatement $command, ?int $rowLimit = null): mixed
     {
@@ -31,6 +34,9 @@ final class RenamedParamsMockAdapter implements AdapterInterface
 
         if ($command->query === $this->failingQuery) {
             throw new RuntimeException('Forced adapter failure');
+        }
+        if ($this->failRollback && $command->query === 'ROLLBACK') {
+            throw new RuntimeException('Forced rollback failure');
         }
 
         return [['value' => 'ok']];

@@ -68,6 +68,7 @@ class Config {
     public const ?string DB_APP_NAME = null;
     public const string DB_ADAPTER_CLASS = \F4\DB\Adapter\PostgresqlAdapter::class;
     public const bool DB_PERSIST = true;
+    public const bool DB_OVERWRITE_DUPLICATE_RESPONSE_COLUMNS = false;
     public const bool DEBUG_MODE = true;
     public const string TIMEZONE = '';
 }
@@ -203,6 +204,16 @@ DB aims to replicate SQL syntax using native PHP expressions as closely as possi
 
 It is primarily focused on PostgreSQL syntax. `PostgresqlAdapter` is first-class; `SqliteAdapter` and `MysqlAdapter` provide optional, non-first-class execution support. Identifiers are quoted by the *active* adapter at query-render time, but raw expressions and SQL grammar remain the caller's responsibility.
 
+Most methods that accept SQL structure use two parsing modes. A string matching
+the method's deliberately strict identifier grammar (with supported variations
+such as `table.column`) is treated as an identifier and quoted through the active
+adapter. Every other string is treated as developer-authored SQL and used as-is.
+The second mode is intentional: it permits SQL expressions and syntax that the
+identifier parser does not understand without attempting to parse arbitrary SQL.
+Never pass untrusted input as one of these strings; bind untrusted data through
+placeholders instead. Placeholder values protect data values, not SQL structure
+such as table names, column names, operators, or ordering directions.
+
 DB currently supports a significant but still limited subset of SQL syntax, which is gradually expanding as new features are added.
 
 Currently supported keywords are:
@@ -274,6 +285,14 @@ Three placeholder types are supported:
 `{#::#}` for a DB Query Builder object instance
 
 These placeholders are internal builder syntax. At preparation time, the active adapter converts scalar placeholders to `$1`, `$2`, … for PostgreSQL or positional `?` parameters for SQLite and MySQL.
+
+Placeholder tokens are reserved throughout a custom SQL string. Recognition is
+deliberately not SQL-aware: `{#}`, `{#,...#}`, and `{#::#}` are placeholders even
+inside quoted literals, quoted identifiers, comments, or dollar-quoted bodies.
+Consequently, those exact token sequences cannot be written literally in a SQL
+template. Bind them as data when they are intended as values. This keeps the
+template language small and independent of the SQL dialect instead of requiring
+the query builder to lex or parse arbitrary SQL.
 
 PostgreSQL normalizes `DateTimeInterface` values as `Y-m-d\TH:i:s.uP`, preserving
 the timezone offset and six-digit microseconds. Unsupported objects are rejected
@@ -563,15 +582,24 @@ After building a query, the following tail methods are available for fetching re
 
 `$query->commit()` same as `asTable()`
 
-`$query->asRow()` to fetch one row
+`$query->asRow()` to fetch one row. This stops fetching on the PHP side after the first row, but does **not** add a server-side `LIMIT` — the database may still compute and return the full result set. Add `->limit(1)` yourself if you want the server to stop early.
 
-`$query->asValue($index)` to fetch scalar value (by numeric index or column name)
+`$query->asValue($index)` to fetch scalar value (by numeric index or column name). Same caveat as `asRow()`: PHP-side fetching stops after the first row, but no `LIMIT` is injected. Use `->limit(1)` for server-side limiting.
 
 `$query->asSQL()` to get SQL with values escaped (for debugging - **not for execution**)
 
 `$query->getPreparedStatement()->query` to get SQL using the active adapter's parameter convention: PostgreSQL produces `$1`, `$2`, …, while SQLite and MySQL produce positional `?` parameters. An explicit enumerator callback overrides the adapter. Standalone `Fragment` instances without adapter context retain the PostgreSQL-style `$n` fallback
 
 `$query->getPreparedStatement()->parameters` to get array of bound parameters
+
+Rows use output column names as associative keys. PostgreSQL, SQLite, and MySQL
+throw `F4\DB\Exception\DuplicateColumnException` when result metadata contains a
+duplicate name, preventing one value from silently overwriting another. Alias
+same-named columns in joins and wildcard selections to make every output name
+unique. For legacy compatibility,
+`DB_OVERWRITE_DUPLICATE_RESPONSE_COLUMNS = true` disables this exception and
+restores last-column-wins overwriting; it is disabled by default because that
+behavior can silently discard data.
 
 ## Data Types
 
@@ -598,6 +626,8 @@ The **PostgreSQL adapter** automatically applies the following casting rules:
         break;
     case 'real':
     case 'double precision':
+    case 'float4':
+    case 'float8':
         $value = (float) $value;
         break;
     case 'numeric':
@@ -612,8 +642,11 @@ The **PostgreSQL adapter** automatically applies the following casting rules:
         $value = match ($value) {
             't' => true,
             'f' => false,
-            default => null
+            default => throw new InvalidResultValueException('Unexpected PostgreSQL boolean representation'),
         };
+        break;
+    case 'bytea':
+        $value = pg_unescape_bytea($value);
         break;
     default:
   }
@@ -621,10 +654,9 @@ The **PostgreSQL adapter** automatically applies the following casting rules:
 ## Best Practices
 
 - **Always use placeholders for user input** - Never concatenate values into SQL strings to prevent SQL injection
-- **Use `asRow()` instead of `asTable()[0]`** when fetching a single row - It's more efficient and stops after finding one result
-- **Use `asValue()` for single values** like `COUNT(*)`, `MAX(id)`, or `SUM(amount)` instead of fetching a full row
+- **Use `asValue()` for single values** like `COUNT(*)`, `MAX(id)`, or `SUM(amount)` instead of fetching a full row. Note that `asRow()`/`asValue()` only stop fetching on the PHP side — add `->limit(1)` when you also want the database to stop producing rows early
 - **Prefer static methods for new queries** - Use `DB::select()` to start a new query chain, instance methods for chaining
-- **Don't reuse builder instances** - Each query should use a fresh instance to avoid mutations accumulating
+- **Don't reuse builder instances** - Each query should use a fresh instance to avoid mutations accumulating, unless the query is intended to be a reusable template.
 
 ## Common Pitfalls
 

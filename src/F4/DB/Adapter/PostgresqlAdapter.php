@@ -36,7 +36,10 @@ use PgSql\{
 };
 
 use function
+    array_count_values,
+    array_find_key,
     array_map,
+    array_unique,
     count,
     implode,
     in_array,
@@ -57,6 +60,7 @@ use function
     pg_free_result,
     pg_get_result,
     pg_last_error,
+    pg_num_fields,
     pg_query,
     pg_result_error_field,
     pg_result_status,
@@ -193,40 +197,72 @@ class PostgresqlAdapter implements AdapterInterface
             throw new Exception(message: pg_last_error($this->connection), code: 500);
         }
         $rows = [];
-        while(($result = pg_get_result($this->connection)) !== FALSE) {
-            switch(pg_result_status($result)) {
-                case PGSQL_BAD_RESPONSE:
-                case PGSQL_NONFATAL_ERROR:
-                case PGSQL_FATAL_ERROR:
-                    throw match($code = pg_result_error_field($result, PGSQL_DIAG_SQLSTATE)) {
-                        null, false => new Exception(message: "Undefined database error", code: 500),
-                        default => $this->convertErrorToException(code: $code, message: pg_last_error($this->connection)),
-                    };
-                case PGSQL_TUPLES_OK:
-                    while ((($stopAfter === null) || $stopAfter > 0) && ($row = pg_fetch_row($result)) !== FALSE) {
-                        if (is_array($row)) {
-                            $processedRow = [];
-                            for ($i = 0; $i < count($row); $i++) {
-                                $processedRow[pg_field_name($result, $i)] = $this->castType($row[$i], pg_field_type($result, $i));
+        try {
+            while(($result = pg_get_result($this->connection)) !== FALSE) {
+                try {
+                    switch(pg_result_status($result)) {
+                        case PGSQL_BAD_RESPONSE:
+                        case PGSQL_NONFATAL_ERROR:
+                        case PGSQL_FATAL_ERROR:
+                            throw match($code = pg_result_error_field($result, PGSQL_DIAG_SQLSTATE)) {
+                                null, false => new Exception(message: "Undefined database error", code: 500),
+                                default => $this->convertErrorToException(code: $code, message: pg_last_error($this->connection)),
+                            };
+                        case PGSQL_TUPLES_OK:
+                            $columnNames = [];
+                            $columnTypes = [];
+                            for ($i = 0; $i < pg_num_fields($result); $i++) {
+                                $columnNames[] = pg_field_name($result, $i);
+                                $columnTypes[] = pg_field_type($result, $i);
                             }
-                        } else {
-                            $processedRow = $row;
-                        }
-                        $rows[] = $processedRow;
-                        if (($stopAfter !== null) && count($rows) >= $stopAfter) {
+                            if (
+                                !Config::DB_OVERWRITE_DUPLICATE_RESPONSE_COLUMNS
+                                && count($columnNames) !== count(array_unique($columnNames))
+                            ) {
+                                $columnName = array_find_key(
+                                    array: array_count_values($columnNames),
+                                    callback: static fn(int $count): bool => $count > 1,
+                                );
+                                throw new DuplicateColumnException(sprintf(
+                                    'Duplicate result column name "%s"; alias duplicate columns in the query',
+                                    $columnName,
+                                ));
+                            }
+
+                            while ((($stopAfter === null) || $stopAfter > 0) && ($row = pg_fetch_row($result)) !== FALSE) {
+                                if (is_array($row)) {
+                                    $processedRow = [];
+                                    for ($i = 0; $i < count($row); $i++) {
+                                        $processedRow[$columnNames[$i]] = $this->castType($row[$i], $columnTypes[$i]);
+                                    }
+                                } else {
+                                    $processedRow = $row;
+                                }
+                                $rows[] = $processedRow;
+                                if (($stopAfter !== null) && count($rows) >= $stopAfter) {
+                                    break;
+                                }
+                            };
                             break;
-                        }
-                    };
-                    break;
-                case PGSQL_EMPTY_QUERY:
-                case PGSQL_COMMAND_OK:
-                case PGSQL_TUPLES_CHUNK:
-                case PGSQL_COPY_OUT:
-                case PGSQL_COPY_IN:
-                default:
-                    break;
+                        case PGSQL_EMPTY_QUERY:
+                        case PGSQL_COMMAND_OK:
+                        case PGSQL_TUPLES_CHUNK:
+                        case PGSQL_COPY_OUT:
+                        case PGSQL_COPY_IN:
+                        default:
+                            break;
+                    }
+                } finally {
+                    pg_free_result($result);
+                }
             }
-            pg_free_result($result);
+        }
+        catch (Throwable $exception) {
+            // Purge remaining data in protocol queue
+            while (($result = pg_get_result($this->connection)) !== false) {
+                pg_free_result($result);
+            }
+            throw $exception;
         }
         return $rows;
     }

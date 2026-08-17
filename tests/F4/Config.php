@@ -15,6 +15,8 @@ class Config  {
     public const string DB_SCHEMA = '';
     public const ?string DB_APP_NAME = null;
     public const bool DB_PERSIST = true;
+    /** Enable only to preserve the legacy last-column-wins result behavior. */
+    public const bool DB_OVERWRITE_DUPLICATE_RESPONSE_COLUMNS = false;
     public const bool DEBUG_MODE = true;
     public const string TIMEZONE = '';
 }

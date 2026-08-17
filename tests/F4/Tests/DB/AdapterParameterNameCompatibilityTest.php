@@ -51,4 +51,25 @@ final class AdapterParameterNameCompatibilityTest extends TestCase
             array_column($adapter->executions, 'query'),
         );
     }
+
+    public function testTransactionRollbackFailureDoesNotReplaceOriginalException(): void
+    {
+        $failingQuery = 'SELECT * FROM "broken"';
+        $adapter = new RenamedParamsMockAdapter($failingQuery, failRollback: true);
+        $transaction = (new DBTransaction(null, $adapter))->add(
+            DB::select()->from('broken'),
+        );
+
+        try {
+            $transaction->commit();
+            $this->fail('Expected the adapter failure to be rethrown');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Forced adapter failure', $exception->getMessage());
+        }
+
+        $this->assertSame(
+            ['BEGIN', $failingQuery, 'ROLLBACK'],
+            array_column($adapter->executions, 'query'),
+        );
+    }
 }

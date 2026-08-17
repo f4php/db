@@ -27,6 +27,9 @@ use F4\DB\Exception\{
 use F4\DB\PreparedStatement;
 
 use function
+    array_count_values,
+    array_find_key,
+    array_unique,
     bin2hex,
     count,
     is_bool,
@@ -147,6 +150,24 @@ class SqliteAdapter implements AdapterInterface
             // fetchArray() on a zero-column result can execute the command again.
             if ($result->numColumns() === 0) {
                 return [];
+            }
+
+            $columnNames = [];
+            for ($index = 0; $index < $result->numColumns(); $index++) {
+                $columnNames[] = $result->columnName($index);
+            }
+            if (
+                !Config::DB_OVERWRITE_DUPLICATE_RESPONSE_COLUMNS
+                && count($columnNames) !== count(array_unique($columnNames))
+            ) {
+                $columnName = array_find_key(
+                    array: array_count_values($columnNames),
+                    callback: static fn(int $count): bool => $count > 1,
+                );
+                throw new DuplicateColumnException(sprintf(
+                    'Duplicate result column name "%s"; alias duplicate columns in the query',
+                    $columnName,
+                ));
             }
 
             $rows = [];

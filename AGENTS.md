@@ -31,6 +31,13 @@ DB uses a custom placeholder syntax for parameter binding:
 
 The final prepared-statement placeholder form is adapter-specific: PostgreSQL enumerates as `$1, $2, …`, SQLite as `?`. Examples below show the PostgreSQL form.
 
+These tokens are reserved throughout every custom SQL string. Placeholder
+recognition deliberately does not analyze SQL lexical regions, so the tokens are
+still interpreted inside quoted literals, quoted identifiers, comments, and
+dollar-quoted bodies. Do not use the literal token sequences in SQL templates;
+bind them as values when they represent data. This is an intentional template
+language rule, not a request for an SQL lexer.
+
 ### Placeholder Examples
 
 ```php
@@ -345,15 +352,24 @@ Different collection types handle different SQL clause structures:
 
 ### Identifier Quoting
 
-DB automatically quotes simple identifiers via the **active adapter at render time** (not at construction). Both bundled adapters use double quotes:
+DB automatically quotes simple identifiers via the **active adapter at render time** (not at construction). PostgreSQL and SQLite use double quotes; MySQL uses backticks:
 
-- `users` → `"users"`
-- `users u` → `"users" AS "u"`
-- `schema.table` → `"schema"."table"`
+- `users` → `"users"` (PostgreSQL/SQLite) or `` `users` `` (MySQL)
+- `users u` → `"users" AS "u"` (PostgreSQL/SQLite)
+- `users.id` in a column-reference context → `"users"."id"` (PostgreSQL/SQLite)
 
 Mechanism: reference strings are parsed into `DelimitedIdentifier`s (see [src/F4/DB/Reference/](src/F4/DB/Reference/)); a collection embeds a recognized reference via the `{#::#}` seam, which calls `getQuery($adapter)` at render time so the query's *current* adapter (honoring `useAdapter()` and transactions) performs the quoting. `AdapterInterface::getEscapedIdentifier()` is connectionless — building/rendering a query never opens a connection. `DB::escapeIdentifier()` returns a `DelimitedIdentifier` (string coercion is deprecated; use `getQuery()`).
 
-A reference string that is **not** a plain identifier — a numeric array key, or a key/expression containing a custom placeholder — is not recognized as an identifier (`getDelimited()` returns `null`) and bypasses automatic quoting, rendered raw by the collection instead.
+Most SQL-structure methods deliberately have two parsing modes. A reference
+string matching the method's strict identifier grammar is automatically quoted.
+Every other string is treated as developer-authored SQL and rendered as-is; a
+numeric array key or a key/expression containing a custom placeholder commonly
+selects this mode. Internally, an unrecognized reference has
+`getDelimited() === null`, and the consuming collection supplies its literal
+fragment. Never pass untrusted input through this SQL-string mode. Only values
+bound through placeholders are protected; identifiers, operators, directions,
+and all other SQL structure must be selected from trusted application code or an
+allowlist.
 
 ## Anti-Patterns to Avoid
 

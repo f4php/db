@@ -79,6 +79,9 @@ class ConditionCollection extends FragmentCollection
                             };
                             $this->append(new Fragment($query, $value));
                         } else {
+                            if (count($value) === 0) {
+                                throw new InvalidArgumentException('IN condition values must not be empty');
+                            }
                             $this->append(new Fragment(
                                 sprintf('%s IN (%s)', Fragment::SUBQUERY_PARAMETER_PLACEHOLDER, Fragment::COMMA_PARAMETER_PLACEHOLDER),
                                 [$reference, $value]
@@ -128,4 +131,3 @@ class ConditionCollection extends FragmentCollection
         }
     }
 }
-

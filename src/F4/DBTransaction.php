@@ -89,8 +89,12 @@ class DBTransaction
                 array: $this->getQueries(),
             );
         } catch (Throwable $e) {
-            $query = DB::raw('ROLLBACK');
-            $this->adapter->execute($query->getPreparedStatement());
+            try {
+                $query = DB::raw('ROLLBACK');
+                $this->adapter->execute($query->getPreparedStatement());
+            } catch (Throwable) {
+                // Preserve the exception that caused the transaction to fail
+            }
             throw $e;
         }
     }
