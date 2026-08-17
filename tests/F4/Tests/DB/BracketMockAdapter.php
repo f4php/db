@@ -11,7 +11,8 @@ use function sprintf;
 
 /**
  * A second connectionless mock adapter that quotes identifiers with [brackets] instead of "double quotes".
- * Used to prove that identifier quoting goes through the ACTIVE adapter at render time.
+ * It also uses positional question-mark parameters, proving that identifier quoting and parameter
+ * enumeration both go through the ACTIVE adapter at render time.
  */
 final class BracketMockAdapter implements AdapterInterface
 {
@@ -23,7 +24,7 @@ final class BracketMockAdapter implements AdapterInterface
     }
     public function enumerateParameters(int $index): string
     {
-        return sprintf('$%d', $index);
+        return '?';
     }
     public function getEscapedBinary(string $value): string
     {

@@ -10,6 +10,22 @@ use InvalidArgumentException;
 
 final class FragmentTest extends TestCase
 {
+    public function testStandaloneFragmentUsesPostgresqlFallbackWithoutAdapter(): void
+    {
+        $preparedStatement = (new Fragment('a = {#} AND b = {#}', [1, 2]))
+            ->getPreparedStatement();
+
+        $this->assertSame('a = $1 AND b = $2', $preparedStatement->query);
+    }
+
+    public function testStandaloneFragmentUsesExplicitAdapterEnumerator(): void
+    {
+        $preparedStatement = (new Fragment('a = {#} AND b = {#}', [1, 2]))
+            ->getPreparedStatement(adapter: new BracketMockAdapter());
+
+        $this->assertSame('a = ? AND b = ?', $preparedStatement->query);
+    }
+
     public function testParametersBasics(): void
     {
         $fragment = new Fragment();

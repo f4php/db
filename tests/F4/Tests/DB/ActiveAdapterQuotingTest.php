@@ -8,8 +8,8 @@ use PHPUnit\Framework\TestCase;
 use F4\DB;
 
 /**
- * Proves audit finding #2 is fixed: identifiers are quoted by the query's ACTIVE adapter at render time,
- * so useAdapter() after construction is honored and quoting is not frozen at reference-construction time.
+ * Proves identifiers and parameters are rendered by the query's ACTIVE adapter, so useAdapter()
+ * after construction updates both quoting and placeholder enumeration.
  */
 final class ActiveAdapterQuotingTest extends TestCase
 {
@@ -27,7 +27,7 @@ final class ActiveAdapterQuotingTest extends TestCase
 
         // Bracket quoting now applies everywhere, including the Parenthesize-backed GROUP BY.
         $this->assertSame(
-            'SELECT * FROM [t] WHERE [t].[col] = $1 GROUP BY ([gcol])',
+            'SELECT * FROM [t] WHERE [t].[col] = ? GROUP BY ([gcol])',
             $query->getPreparedStatement()->query,
         );
     }
@@ -50,5 +50,44 @@ final class ActiveAdapterQuotingTest extends TestCase
             'SELECT * FROM [t] WHERE [col] = (SELECT [x] FROM [inner])',
             $query->getPreparedStatement()->query,
         );
+    }
+
+    public function testActiveAdapterEnumeratesNestedAndExpandedParameters(): void
+    {
+        $query = DB::select()
+            ->from('outer')
+            ->where([
+                'status' => ['active', 'pending'],
+                'child_id' => DB::select('id')
+                    ->from('inner')
+                    ->where(['enabled' => true]),
+            ])
+            ->useAdapter(new BracketMockAdapter());
+
+        $preparedStatement = $query->getPreparedStatement();
+
+        $this->assertSame(
+            'SELECT * FROM [outer] WHERE [status] IN (?,?) AND [child_id] = (SELECT [id] FROM [inner] WHERE [enabled] = ?)',
+            $preparedStatement->query,
+        );
+        $this->assertSame(['active', 'pending', true], $preparedStatement->parameters);
+    }
+
+    public function testExplicitEnumeratorOverridesActiveAdapterEnumerator(): void
+    {
+        $query = DB::select()
+            ->from('t')
+            ->where(['a' => 1, 'b' => [2, 3]])
+            ->useAdapter(new BracketMockAdapter());
+
+        $preparedStatement = $query->getPreparedStatement(
+            static fn (int $index): string => ":parameter_{$index}",
+        );
+
+        $this->assertSame(
+            'SELECT * FROM [t] WHERE [a] = :parameter_1 AND [b] IN (:parameter_2,:parameter_3)',
+            $preparedStatement->query,
+        );
+        $this->assertSame([1, 2, 3], $preparedStatement->parameters);
     }
 }

@@ -120,13 +120,13 @@ class Fragment implements FragmentInterface
     public function getPreparedStatement(?callable $enumeratorCallback = null, ?AdapterInterface $adapter = null): PreparedStatement
     {
         /**
-         * This is the default parameter enumerator for pg_sql, which converts every scalar parameter placeholder,
-         * or {#}, into $1, $2, $3 etc.
-         *
-         * Other databases or drivers may use a different convention for prepared statement parameters,
-         * in those situations $enumeratorCallback could be used to provide an alternative
+         * An explicit enumerator takes precedence, followed by the supplied adapter's enumerator.
+         * Standalone fragments without either retain the PostgreSQL-style $1, $2, ... fallback.
          */
-        $enumeratorCallback ??= fn(int $index): string => sprintf('$%d', $index);
+        $enumeratorCallback ??= match ($adapter) {
+            null => fn(int $index): string => sprintf('$%d', $index),
+            default => $adapter->enumerateParameters(...),
+        };
         [$query, $parameters] = $this->unpackComplexPlaceholders(query: $this->getQuery($adapter), parameters: $this->parameters, adapter: $adapter);
         $index = 1;
         $query = Preg::replaceCallback("/(" . preg_quote(self::SINGLE_PARAMETER_PLACEHOLDER, '/') . ")/u", function () use (&$index, $enumeratorCallback): string {
@@ -169,4 +169,3 @@ class Fragment implements FragmentInterface
         return $this;
     }
 }
-
