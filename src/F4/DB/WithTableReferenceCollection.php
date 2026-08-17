@@ -40,11 +40,14 @@ class WithTableReferenceCollection extends FragmentCollection
                     $this->addExpression($value);
                 } else {
                     if ($value instanceof FragmentInterface) {
-                        $query = match ($quoted = new SimpleReference($key)->delimitedIdentifier) {
-                            null => $key,
-                            default => sprintf('%s AS (%s)', $quoted, Fragment::SUBQUERY_PARAMETER_PLACEHOLDER)
-                        };
-                        $this->append(new Fragment($query, [$value]));
+                        $reference = new SimpleReference($key)->getDelimited();
+                        $this->append(match ($reference) {
+                            null => new Fragment($key, [$value]),
+                            default => new Fragment(
+                                sprintf('%s AS (%s)', Fragment::SUBQUERY_PARAMETER_PLACEHOLDER, Fragment::SUBQUERY_PARAMETER_PLACEHOLDER),
+                                [$reference, $value]
+                            )
+                        });
                     } else if (is_scalar($value)) {
                         throw new InvalidArgumentException('Scalar values as table references are not supported');
                     } else if (is_array($value)) {
@@ -57,11 +60,8 @@ class WithTableReferenceCollection extends FragmentCollection
         } elseif ($expression instanceof FragmentInterface) {
             throw new InvalidArgumentException('Subqueries must have an alias');
         } else {
-            $query = match ($quoted = new TableReferenceWithAlias((string) $expression)->delimitedIdentifier) {
-                null => (string) $expression,
-                default => $quoted
-            };
-            $this->append(new Fragment($query, []));
+            $reference = new TableReferenceWithAlias((string) $expression)->getDelimited();
+            $this->append($reference ?? new Fragment((string) $expression, []));
         }
     }
 }

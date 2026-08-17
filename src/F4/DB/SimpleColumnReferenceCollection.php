@@ -42,11 +42,8 @@ class SimpleColumnReferenceCollection extends FragmentCollection
         } elseif ($expression instanceof FragmentInterface) {
             $this->append($expression);
         } else {
-            $query = match ($quoted = new ColumnReference((string) $expression)->delimitedIdentifier) {
-                null => (string) $expression,
-                default => $quoted
-            };
-            $this->append(new Fragment($query, []));
+            $reference = new ColumnReference((string) $expression)->getDelimited();
+            $this->append($reference ?? new Fragment((string) $expression, []));
         }
     }
 }

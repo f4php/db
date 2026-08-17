@@ -10,6 +10,7 @@ use F4\DB\{
     FragmentInterface,
     PreparedStatement,
 };
+use F4\DB\Adapter\AdapterInterface;
 
 use function
     array_key_exists,
@@ -75,11 +76,11 @@ class Fragment implements FragmentInterface
             ),
         );
     }
-    protected function unpackComplexPlaceholders(string $query, array $parameters): array
+    protected function unpackComplexPlaceholders(string $query, array $parameters, ?AdapterInterface $adapter = null): array
     {
         $regExpPattern = self::getPlaceholderRegExp();
         $unpackedParameters = [];
-        $unpackedQuery = Preg::replaceCallback("/({$regExpPattern})/u", function ($matches) use (&$parameters, &$unpackedParameters) {
+        $unpackedQuery = Preg::replaceCallback("/({$regExpPattern})/u", function ($matches) use (&$parameters, &$unpackedParameters, $adapter) {
             $pattern = $matches[1];
             if ($pattern === self::COMMA_PARAMETER_PLACEHOLDER) {
                 return implode(
@@ -94,7 +95,7 @@ class Fragment implements FragmentInterface
                 );
             } elseif ($pattern === self::SUBQUERY_PARAMETER_PLACEHOLDER) {
                 $fragment = array_shift($parameters);
-                [$subQuery, $subParameters] = $this->unpackComplexPlaceholders($fragment->getQuery(), $fragment->getParameters());
+                [$subQuery, $subParameters] = $this->unpackComplexPlaceholders($fragment->getQuery($adapter), $fragment->getParameters(), $adapter);
                 $unpackedParameters = [...$unpackedParameters, ...$subParameters];
                 return $subQuery;
             } else {
@@ -116,24 +117,24 @@ class Fragment implements FragmentInterface
     {
         return $this->parameters;
     }
-    public function getPreparedStatement(?callable $enumeratorCallback = null): PreparedStatement
+    public function getPreparedStatement(?callable $enumeratorCallback = null, ?AdapterInterface $adapter = null): PreparedStatement
     {
         /**
-         * This is the default parameter enumerator for pg_sql, which converts every scalar parameter placeholder, 
+         * This is the default parameter enumerator for pg_sql, which converts every scalar parameter placeholder,
          * or {#}, into $1, $2, $3 etc.
-         * 
+         *
          * Other databases or drivers may use a different convention for prepared statement parameters,
          * in those situations $enumeratorCallback could be used to provide an alternative
          */
         $enumeratorCallback ??= fn(int $index): string => sprintf('$%d', $index);
-        [$query, $parameters] = $this->unpackComplexPlaceholders(query: $this->query, parameters: $this->parameters);
+        [$query, $parameters] = $this->unpackComplexPlaceholders(query: $this->getQuery($adapter), parameters: $this->parameters, adapter: $adapter);
         $index = 1;
         $query = Preg::replaceCallback("/(" . preg_quote(self::SINGLE_PARAMETER_PLACEHOLDER, '/') . ")/u", function () use (&$index, $enumeratorCallback): string {
             return $enumeratorCallback($index++);
         }, $query);
         return new PreparedStatement(query: $query, parameters: $parameters);
     }
-    public function getQuery(): string
+    public function getQuery(?AdapterInterface $adapter = null): string
     {
         return match ($this->query === '') {
             true => '',

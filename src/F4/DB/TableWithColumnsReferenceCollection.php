@@ -39,12 +39,9 @@ class TableWithColumnsReferenceCollection extends FragmentCollection
                     $this->addExpression($value);
                 } else {
                     if (is_array($value)) {
-                        $query = match ($quoted = (new TableReferenceWithAlias($key))->delimitedIdentifier) {
-                            null => $key,
-                            default => $quoted
-                        };
+                        $reference = new TableReferenceWithAlias($key)->getDelimited();
                         $this
-                            ->append(new FragmentCollection($query, new Parenthesize(new SimpleColumnReferenceCollection($value))));
+                            ->append(new FragmentCollection($reference ?? $key, new Parenthesize(new SimpleColumnReferenceCollection($value))));
                     } else {
                         throw new InvalidArgumentException('Unsupported column reference');
                     }
@@ -53,11 +50,8 @@ class TableWithColumnsReferenceCollection extends FragmentCollection
         } elseif ($expression instanceof FragmentInterface) {
             throw new InvalidArgumentException('Subqueries are not supported');
         } else {
-            $query = match ($quoted = new TableReferenceWithAlias((string) $expression)->delimitedIdentifier) {
-                null => (string) $expression,
-                default => $quoted
-            };
-            $this->append(new Fragment($query, []));
+            $reference = new TableReferenceWithAlias((string) $expression)->getDelimited();
+            $this->append($reference ?? new Fragment((string) $expression, []));
         }
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace F4\DB\Adapter;
 
+use Composer\Pcre\Preg;
 use DateTime,
     ErrorException,
     InvalidArgumentException,
@@ -31,19 +32,21 @@ use PgSql\{
     // Result,
 };
 
-use function 
+use function
     array_map,
     count,
+    in_array,
     is_array,
     is_bool,
     is_float,
     is_int,
     is_scalar,
     json_decode,
+    mb_check_encoding,
+    mb_list_encodings,
     mb_substr,
     mb_trim,
     pg_escape_bytea,
-    pg_escape_identifier,
     pg_escape_literal,
     pg_fetch_row,
     pg_field_name,
@@ -58,7 +61,9 @@ use function
     pg_send_query,
     pg_set_client_encoding,
     pg_unescape_bytea,
-    sprintf;
+    sprintf,
+    str_contains,
+    strtoupper;
 
 /**
  * 
@@ -70,6 +75,29 @@ use function
  */
 class PostgresqlAdapter implements AdapterInterface
 {
+    /**
+     * PostgreSQL client-encoding name (Config::DB_CHARSET) => mbstring encoding name.
+     * Used to validate identifier bytes connectionlessly, mirroring pg_escape_identifier's
+     * client-encoding check. Charsets not listed here skip validation (pass-through) rather
+     * than being falsely rejected.
+     */
+    private const array MBSTRING_ENCODING_MAP = [
+        'UTF8' => 'UTF-8',
+        'LATIN1' => 'ISO-8859-1',
+        'LATIN2' => 'ISO-8859-2',
+        'LATIN5' => 'ISO-8859-9',
+        'LATIN9' => 'ISO-8859-15',
+        'WIN1251' => 'Windows-1251',
+        'WIN1252' => 'Windows-1252',
+        'EUC_JP' => 'EUC-JP',
+        'EUC_KR' => 'EUC-KR',
+        'SJIS' => 'SJIS',
+        'BIG5' => 'BIG-5',
+        'GBK' => 'CP936',
+        'UHC' => 'UHC',
+        'SQL_ASCII' => 'ASCII',
+    ];
+
     protected Connection $connection {
         get => $this->connection ?? ($this->connection=$this->connect(connectionString: $this->connectionString, connectionFlags: $this->connectionFlags));
     }
@@ -290,11 +318,36 @@ class PostgresqlAdapter implements AdapterInterface
         }
         return pg_escape_bytea($this->connection, $value);
     }
-    public function getEscapedIdentifier(mixed $value): string
+    public function getEscapedIdentifier(string $identifier): string
     {
-        if (!$this->connection) {
-            throw new ErrorException('Failed to connect to the database', 500);
+        /**
+         * Connectionless identifier quoting: PostgreSQL identifier quoting is a fixed rule
+         * (wrap in double quotes, double any embedded double quote) — pg_escape_identifier is
+         * connection-bound only to validate identifier bytes against the client encoding. We
+         * reproduce that validation against the configured Config::DB_CHARSET (the same value
+         * connect() pushes via pg_set_client_encoding), so identifiers are quoted at render time
+         * and during prepared-statement generation without ever opening a connection.
+         */
+        if ($identifier === '') {
+            throw new InvalidArgumentException('Cannot quote an empty SQL identifier');
         }
-        return pg_escape_identifier($this->connection, (string) $value);
+        if (str_contains($identifier, "\0")) {
+            throw new InvalidArgumentException('SQL identifier contains a NUL byte');
+        }
+        $mbEncoding = self::MBSTRING_ENCODING_MAP[strtoupper(Config::DB_CHARSET)] ?? null;
+        // Only validate when this mbstring build actually supports the mapped encoding name;
+        // otherwise pass through (unknown/unsupported mappings must not throw a ValueError).
+        if ($mbEncoding !== null && self::isSupportedMbEncoding($mbEncoding) && !mb_check_encoding($identifier, $mbEncoding)) {
+            throw new InvalidArgumentException(sprintf('SQL identifier is not valid %s', Config::DB_CHARSET));
+        }
+        // No /u modifier: we double the ASCII byte 0x22 (") and must not require the subject
+        // to be valid UTF-8, otherwise valid non-UTF-8 identifiers (e.g. LATIN1) would throw.
+        return sprintf('"%s"', Preg::replace(pattern: '/"/', replacement: '""', subject: $identifier));
+    }
+    private static function isSupportedMbEncoding(string $encoding): bool
+    {
+        static $supported = null;
+        $supported ??= array_map(strtoupper(...), mb_list_encodings());
+        return in_array(strtoupper($encoding), $supported, true);
     }
 }

@@ -12,6 +12,7 @@ use F4\DB\{
     StaticOfMethodTrait,
     Reference\ColumnReference,
 };
+use F4\DB\Adapter\AdapterInterface;
 use InvalidArgumentException;
 
 use function
@@ -41,11 +42,11 @@ class ConditionCollection extends FragmentCollection
     {
         $this->addExpression($arguments);
     }
-    public function getQuery(): string
+    public function getQuery(?AdapterInterface $adapter = null): string
     {
         $query = implode(static::GLUE, array_filter(
             array: array_map(
-                callback: fn (FragmentInterface $fragment): string => $fragment->getQuery(),
+                callback: fn (FragmentInterface $fragment): string => $fragment->getQuery($adapter),
                 array: $this->fragments
             ),
             callback: fn($query) => $query !== '')
@@ -68,45 +69,53 @@ class ConditionCollection extends FragmentCollection
                 if (is_numeric($key)) {
                     $this->addExpression($value);
                 } else {
+                    $reference = new ColumnReference($key)->getDelimited();
                     if (is_array($value)) {
-                        $query = match ($quoted = new ColumnReference($key)->delimitedIdentifier) {
-                            null => $key,
-                            default => sprintf('%s IN (%s)', $quoted, Fragment::COMMA_PARAMETER_PLACEHOLDER)
-                        };
-                        $value = match(count(Fragment::extractPlaceholders($query)) > 1) {
-                            true => $value,
-                            default => [$value]
-                        };
-                        $this->append(new Fragment($query, $value));
+                        if ($reference === null) {
+                            $query = $key;
+                            $value = match(count(Fragment::extractPlaceholders($query)) > 1) {
+                                true => $value,
+                                default => [$value]
+                            };
+                            $this->append(new Fragment($query, $value));
+                        } else {
+                            $this->append(new Fragment(
+                                sprintf('%s IN (%s)', Fragment::SUBQUERY_PARAMETER_PLACEHOLDER, Fragment::COMMA_PARAMETER_PLACEHOLDER),
+                                [$reference, $value]
+                            ));
+                        }
                     } elseif ($value instanceof FragmentInterface) {
-                        $query = match ($quoted = new ColumnReference($key)->delimitedIdentifier) {
-                            null => $key,
-                            /**
-                             * By default, we assume that subquery returns a single value
-                             * If not, a "field" IN ({#::#}) is still supported in custom query mode
-                             */
-                            default => sprintf('%s = (%s)', $quoted, Fragment::SUBQUERY_PARAMETER_PLACEHOLDER)
-                        };
-                        $this->append(new Fragment($query, [$value]));
+                        /**
+                         * By default, we assume that subquery returns a single value
+                         * If not, a "field" IN ({#::#}) is still supported in custom query mode
+                         */
+                        $this->append(match ($reference) {
+                            null => new Fragment($key, [$value]),
+                            default => new Fragment(
+                                sprintf('%s = (%s)', Fragment::SUBQUERY_PARAMETER_PLACEHOLDER, Fragment::SUBQUERY_PARAMETER_PLACEHOLDER),
+                                [$reference, $value]
+                            )
+                        });
                     } else if ($value === null) {
-                        $query = match ($quoted = new ColumnReference($key)->delimitedIdentifier) {
-                            null => $key,
-                            default => sprintf('%s IS NULL', $quoted)
-                        };
-                        match ($quoted) {
+                        match ($reference) {
                             /**
-                             * This is questionable, since bound value of null will always require extra tricks 
+                             * This is questionable, since bound value of null will always require extra tricks
                              * like type cast in order for the expression to work
                              */
-                            null => $this->append(new Fragment($query, [$value])),
-                            default => $this->append(new Fragment($query))
+                            null => $this->append(new Fragment($key, [$value])),
+                            default => $this->append(new Fragment(
+                                sprintf('%s IS NULL', Fragment::SUBQUERY_PARAMETER_PLACEHOLDER),
+                                [$reference]
+                            ))
                         };
                     } else if (is_scalar($value)) {
-                        $query = match ($quoted = new ColumnReference($key)->delimitedIdentifier) {
-                            null => $key,
-                            default => sprintf('%s = %s', $quoted, Fragment::SINGLE_PARAMETER_PLACEHOLDER)
-                        };
-                        $this->append(new Fragment($query, [$value]));
+                        $this->append(match ($reference) {
+                            null => new Fragment($key, [$value]),
+                            default => new Fragment(
+                                sprintf('%s = %s', Fragment::SUBQUERY_PARAMETER_PLACEHOLDER, Fragment::SINGLE_PARAMETER_PLACEHOLDER),
+                                [$reference, $value]
+                            )
+                        });
                     } else {
                         throw new InvalidArgumentException('Unsupported condition type');
                     }

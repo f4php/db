@@ -12,11 +12,13 @@ use F4\DB\{
     Adapter\AdapterInterface,
     AssignmentCollection,
     ConditionCollection,
+    DelimitedIdentifier,
     FragmentInterface,
     FragmentCollection,
     FragmentCollectionInterface,
     OrderCollection,
     Parenthesize,
+    PreparedStatement,
     QueryBuilderInterface,
     SelectExpressionCollection,
     SimpleColumnReferenceCollection,
@@ -86,6 +88,14 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     public function asRow(): ?array
     {
         return $this->commit(stopAfter: 1)[0] ?? null;
+    }
+    public function getQuery(?AdapterInterface $adapter = null): string
+    {
+        return parent::getQuery($adapter ?? $this->adapter);
+    }
+    public function getPreparedStatement(?callable $enumeratorCallback = null, ?AdapterInterface $adapter = null): PreparedStatement
+    {
+        return parent::getPreparedStatement($enumeratorCallback, $adapter ?? $this->adapter);
     }
     public function asSQL(): string
     {
@@ -223,9 +233,9 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     {
         return $this->adapter->getEscapedBinary($string);
     }
-    public function escapeIdentifier(string $identifier): string
+    public function escapeIdentifier(string $identifier): DelimitedIdentifier
     {
-        return $this->adapter->getEscapedIdentifier($identifier);
+        return new DelimitedIdentifier($identifier, $this->adapter);
     }
     public function except(): static
     {

@@ -203,7 +203,7 @@ class DB
     {
         return new static()->queryBuilder->escapeBinary($string);
     }
-    public static function escapeIdentifier(string $identifier): string
+    public static function escapeIdentifier(string $identifier): DB\DelimitedIdentifier
     {
         return new static()->queryBuilder->escapeIdentifier($identifier);
     }

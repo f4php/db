@@ -9,6 +9,7 @@ use F4\DB\{
     FragmentCollectionInterface,
     FragmentInterface
 };
+use F4\DB\Adapter\AdapterInterface;
 
 use function
     array_filter,
@@ -34,13 +35,13 @@ class Parenthesize extends FragmentCollection implements FragmentCollectionInter
             array: $arguments,
         );
     }
-    public function getQuery(): string
+    public function getQuery(?AdapterInterface $adapter = null): string
     {
         $query = implode(
             separator: static::GLUE,
             array: array_filter(
                 array: array_map(
-                    callback: fn(FragmentInterface $fragment): string => $fragment->getQuery(),
+                    callback: fn(FragmentInterface $fragment): string => $fragment->getQuery($adapter),
                     array: $this->fragments,
                 ),
                 callback: fn($query) => $query !== ''

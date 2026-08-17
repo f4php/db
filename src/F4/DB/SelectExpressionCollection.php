@@ -41,28 +41,37 @@ class SelectExpressionCollection extends FragmentCollection
                 if (is_numeric($key)) {
                     $this->addExpression($value);
                 } else {
+                    $reference = new SimpleReference($key)->getDelimited();
                     if (is_array($value)) {
-                        $query = match ($quoted = new SimpleReference($key)->delimitedIdentifier) {
-                            null => $key,
-                            default => sprintf('(%s) AS %s', Fragment::COMMA_PARAMETER_PLACEHOLDER, $quoted)
-                        };
-                        $value = match(count(Fragment::extractPlaceholders($query)) > 1) {
-                            true => $value,
-                            default => [$value]
-                        };
-                        $this->append(new Fragment($query, $value));
+                        if ($reference === null) {
+                            $query = $key;
+                            $value = match(count(Fragment::extractPlaceholders($query)) > 1) {
+                                true => $value,
+                                default => [$value]
+                            };
+                            $this->append(new Fragment($query, $value));
+                        } else {
+                            $this->append(new Fragment(
+                                sprintf('(%s) AS %s', Fragment::COMMA_PARAMETER_PLACEHOLDER, Fragment::SUBQUERY_PARAMETER_PLACEHOLDER),
+                                [$value, $reference]
+                            ));
+                        }
                     } else if ($value instanceof FragmentInterface) {
-                        $query = match ($quoted = new SimpleReference($key)->delimitedIdentifier) {
-                            null => $key,
-                            default => sprintf('(%s) AS %s', Fragment::SUBQUERY_PARAMETER_PLACEHOLDER, $quoted)
-                        };
-                        $this->append(new Fragment($query, [$value]));
+                        $this->append(match ($reference) {
+                            null => new Fragment($key, [$value]),
+                            default => new Fragment(
+                                sprintf('(%s) AS %s', Fragment::SUBQUERY_PARAMETER_PLACEHOLDER, Fragment::SUBQUERY_PARAMETER_PLACEHOLDER),
+                                [$value, $reference]
+                            )
+                        });
                     } else if ($value === null || is_scalar($value)) {
-                        $query = match ($quoted = new SimpleReference($key)->delimitedIdentifier) {
-                            null => $key,
-                            default => sprintf('%s AS %s', Fragment::SINGLE_PARAMETER_PLACEHOLDER, $quoted)
-                        };
-                        $this->append(new Fragment($query, [$value]));
+                        $this->append(match ($reference) {
+                            null => new Fragment($key, [$value]),
+                            default => new Fragment(
+                                sprintf('%s AS %s', Fragment::SINGLE_PARAMETER_PLACEHOLDER, Fragment::SUBQUERY_PARAMETER_PLACEHOLDER),
+                                [$value, $reference]
+                            )
+                        });
                     } else {
                         throw new InvalidArgumentException('Unsupported type');
                     }
@@ -71,11 +80,8 @@ class SelectExpressionCollection extends FragmentCollection
         } elseif ($expression instanceof FragmentInterface) {
             $this->append($expression);
         } else {
-            $query = match ($quoted = new ColumnReferenceWithAlias((string) $expression)->delimitedIdentifier) {
-                null => (string) $expression,
-                default => $quoted
-            };
-            $this->append(new Fragment($query, []));
+            $reference = new ColumnReferenceWithAlias((string) $expression)->getDelimited();
+            $this->append($reference ?? new Fragment((string) $expression, []));
         }
     }
 }

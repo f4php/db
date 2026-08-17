@@ -39,11 +39,12 @@ class OrderCollection extends FragmentCollection
                 if (is_numeric($key)) {
                     $this->addExpression($value);
                 } elseif (is_scalar($value) && ((mb_trim(mb_strtoupper($value)) === 'ASC') || (mb_trim(mb_strtoupper($value)) === 'DESC'))) {
-                    $query = match ($quoted = new SimpleReference($key)->delimitedIdentifier) {
-                        null => sprintf('%s %s', $key, mb_trim(mb_strtoupper($value))),
-                        default => sprintf('%s %s', $quoted, mb_trim(mb_strtoupper($value)))
-                    };
-                    $this->append(new Fragment($query));
+                    $direction = mb_trim(mb_strtoupper($value));
+                    $reference = new SimpleReference($key)->getDelimited();
+                    $this->append(match ($reference) {
+                        null => new Fragment(sprintf('%s %s', $key, $direction)),
+                        default => new Fragment(sprintf('%s %s', Fragment::SUBQUERY_PARAMETER_PLACEHOLDER, $direction), [$reference])
+                    });
                 } else {
                     throw new InvalidArgumentException("Order epxression must be an array in the form 'field_name'=>'asc' or 'field_name'=>'desc'");
                 }

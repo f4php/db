@@ -41,7 +41,7 @@ interface QueryBuilderInterface extends FragmentCollectionInterface, FragmentInt
     public function dropTableWithCascade(...$arguments): static;
     public function dropTableIfExistsWithCascade(...$arguments): static;
     public function escapeBinary(string $string): string;
-    public function escapeIdentifier(string $identifier): string;
+    public function escapeIdentifier(string $identifier): DelimitedIdentifier;
     public function except(): static;
     public function exceptAll(): static;
     public function from(...$arguments): static;

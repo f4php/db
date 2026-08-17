@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace F4\Tests;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\IgnoreDeprecations;
 
 use InvalidArgumentException;
 use F4\DB;
@@ -286,7 +287,13 @@ final class DBTest extends TestCase
     public function testEscapeIdentifier(): void
     {
         $identifier1 = DB::escapeIdentifier('table"name');
-        $this->assertSame('"table""name"', $identifier1);
+        $this->assertSame('"table""name"', $identifier1->getQuery());
+    }
+    #[IgnoreDeprecations]
+    public function testEscapeIdentifierStringCoercionIsDeprecated(): void
+    {
+        $this->expectUserDeprecationMessage('Coercing DelimitedIdentifier to string is deprecated; use getQuery().');
+        $this->assertSame('"col"', (string) DB::escapeIdentifier('col'));
     }
     public function testSimpleCloning(): void
     {
