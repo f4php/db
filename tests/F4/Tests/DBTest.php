@@ -206,6 +206,21 @@ final class DBTest extends TestCase
         $db2 = DB::select()->from('t1')->limit(10)->offset(0);
         $this->assertSame('SELECT * FROM "t1" LIMIT 10 OFFSET 0', $db2->getPreparedStatement()->query);
     }
+    public function testNegativeLimit(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        DB::select()->from('t1')->limit(-1);
+    }
+    public function testNegativeLimitOffset(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        DB::select()->from('t1')->limit(10, -2);
+    }
+    public function testNegativeOffset(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        DB::select()->from('t1')->offset(-2);
+    }
     public function testJoins(): void
     {
         $db1 = DB::select()->from('table1 t1')->join("table2 t2")->using('fieldA', 'fieldB');

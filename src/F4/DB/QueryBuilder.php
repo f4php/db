@@ -374,6 +374,12 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     }
     public function limit(int $limit, ?int $offset = null): static
     {
+        if ($limit < 0) {
+            throw new InvalidArgumentException('limit() expects a non-negative value, got ' . $limit);
+        }
+        if ($offset !== null && $offset < 0) {
+            throw new InvalidArgumentException('limit() expects a non-negative offset, got ' . $offset);
+        }
         $this->append(match ($offset === null) {
             true => sprintf('LIMIT %d', $limit),
             default => sprintf('LIMIT %d OFFSET %d', $limit, $offset)
@@ -397,6 +403,9 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     }
     public function offset(int $offset): static
     {
+        if ($offset < 0) {
+            throw new InvalidArgumentException('offset() expects a non-negative value, got ' . $offset);
+        }
         $this->append(sprintf('OFFSET %d', $offset));
         return $this;
     }
