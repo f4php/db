@@ -87,11 +87,12 @@ class MysqlAdapter implements AdapterInterface
         'EUCJPMS' => 'EUC-JP',
     ];
 
+    private ?mysqli $connectionHandle = null;
     protected mysqli $connection {
-        get => $this->connection ?? ($this->connection = $this->connect(
+        get => $this->connectionHandle ??= $this->connect(
             connectionString: $this->connectionString,
             connectionFlags: $this->connectionFlags,
-        ));
+        );
     }
     protected string $connectionString;
     protected int $connectionFlags;
@@ -203,6 +204,23 @@ class MysqlAdapter implements AdapterInterface
                 code: 500,
                 previous: $exception,
             );
+        }
+    }
+
+    public function discardConnection(): void
+    {
+        $connection = $this->connectionHandle;
+        $this->connectionHandle = null;
+        if ($connection === null) {
+            return;
+        }
+        // MySQL exposes no usable connection-reset primitive in this runtime, so a
+        // pooled persistent session cannot be guaranteed clean after a failed ROLLBACK
+        // (documented limitation). Close the handle and drop it so it is not reused.
+        try {
+            $connection->close();
+        } catch (Throwable) {
+            // discardConnection() must never throw: the handle is already dropped.
         }
     }
 

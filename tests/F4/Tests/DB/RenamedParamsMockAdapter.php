@@ -18,6 +18,7 @@ final class RenamedParamsMockAdapter implements AdapterInterface
 {
     /** @var list<array{query: string, parameters: array, limit: ?int}> */
     public array $executions = [];
+    public int $discardCount = 0;
 
     public function __construct(
         private readonly ?string $failingQuery = null,
@@ -40,6 +41,11 @@ final class RenamedParamsMockAdapter implements AdapterInterface
         }
 
         return [['value' => 'ok']];
+    }
+
+    public function discardConnection(): void
+    {
+        $this->discardCount++;
     }
 
     public function enumerateParameters(int $position): string

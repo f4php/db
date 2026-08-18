@@ -55,11 +55,12 @@ class SqliteAdapter implements AdapterInterface
     private const int SQLITE_CONSTRAINT_UNIQUE = 2067;
     private const int SQLITE_RANGE = 25;
 
+    private ?SQLite3 $connectionHandle = null;
     protected SQLite3 $connection {
-        get => $this->connection ?? ($this->connection = $this->connect(
+        get => $this->connectionHandle ??= $this->connect(
             connectionString: $this->connectionString,
             connectionFlags: $this->connectionFlags,
-        ));
+        );
     }
     protected string $connectionString;
     protected int $connectionFlags;
@@ -101,6 +102,22 @@ class SqliteAdapter implements AdapterInterface
                 code: 500,
                 previous: $exception,
             );
+        }
+    }
+
+    public function discardConnection(): void
+    {
+        $connection = $this->connectionHandle;
+        $this->connectionHandle = null;
+        if ($connection === null) {
+            return;
+        }
+        // No connection pooling for SQLite; close and drop the handle for uniformity
+        // so a connection left in a dirty transactional state is not reused.
+        try {
+            $connection->close();
+        } catch (Throwable) {
+            // discardConnection() must never throw: the handle is already dropped.
         }
     }
 

@@ -28,6 +28,8 @@ use F4\DB\Exception\{
     UnknownFunctionException,
     UnknownTableException,
 };
+use F4\DB\Adapter\PostgresqlAdapter\ArrayParser;
+use F4\DB\Adapter\PostgresqlAdapter\ParseException;
 use F4\DB\PreparedStatement;
 
 use PgSql\{
@@ -52,6 +54,8 @@ use function
     mb_check_encoding,
     mb_list_encodings,
     mb_str_split,
+    pg_close,
+    pg_connection_reset,
     pg_escape_bytea,
     pg_escape_literal,
     pg_fetch_row,
@@ -72,6 +76,7 @@ use function
     str_contains,
     str_replace,
     str_starts_with,
+    substr,
     trim,
     strtoupper;
 
@@ -85,6 +90,14 @@ use function
  */
 class PostgresqlAdapter implements AdapterInterface
 {
+    /**
+     * Array element type name => non-default array element delimiter.
+     * PostgreSQL uses ',' for every built-in type except 'box' (pg_type.typdelim = ';').
+     * Element types not listed here use the ',' default.
+     */
+    private const array ARRAY_ELEMENT_DELIMITERS = [
+        'box' => ';',
+    ];
     /**
      * PostgreSQL client-encoding name (Config::DB_CHARSET) => mbstring encoding name.
      * Used to validate identifier bytes connectionlessly, mirroring pg_escape_identifier's
@@ -108,8 +121,9 @@ class PostgresqlAdapter implements AdapterInterface
         'SQL_ASCII' => 'ASCII',
     ];
 
+    private ?Connection $connectionHandle = null;
     protected Connection $connection {
-        get => $this->connection ?? ($this->connection=$this->connect(connectionString: $this->connectionString, connectionFlags: $this->connectionFlags));
+        get => $this->connectionHandle ??= $this->connect(connectionString: $this->connectionString, connectionFlags: $this->connectionFlags);
     }
     protected ?string $connectionString;
     protected int $connectionFlags;
@@ -288,6 +302,21 @@ class PostgresqlAdapter implements AdapterInterface
             if ($value === null) {
                 return null;
             }
+            // Array columns are reported by pg_field_type() with a leading underscore
+            // (e.g. "_int4", "_text"); the value arrives as the raw array literal string.
+            // Parse it into a nested PHP array, then cast each element via the element type.
+            if (str_starts_with($type, '_')) {
+                $elementType = substr($type, 1);
+                try {
+                    $parsed = new ArrayParser()->parse($value, $this->resolveArrayDelimiter($elementType));
+                } catch (ParseException $exception) {
+                    throw new InvalidResultValueException(
+                        message: 'Malformed PostgreSQL array literal',
+                        previous: $exception,
+                    );
+                }
+                return $this->castType($parsed, $elementType);
+            }
             switch ($type) {
                 case 'smallint':
                 case 'smallserial':
@@ -324,15 +353,22 @@ class PostgresqlAdapter implements AdapterInterface
                 case 'bytea':
                     $value = pg_unescape_bytea($value);
                     break;
-                // TODO: process pgsql arrays http://stackoverflow.com/questions/9169176/accessing-psql-array-directly-in-php
-                //        case '_text':
-                //                  if($parts='')
-                //                    $value=$this->castType($parts, $type);
-                //                  break;
                 default:
             }
         }
         return $value;
+    }
+    /**
+     * Resolve the array element delimiter for a given element type name.
+     *
+     * PostgreSQL uses ',' for every built-in type except 'box', whose arrays are
+     * delimited by ';' (pg_type.typdelim). The type name is all pg_field_type()
+     * exposes, so the delimiter is derived from it here. Override this to support
+     * user-defined types that declare a non-default delimiter.
+     */
+    protected function resolveArrayDelimiter(string $elementType): string
+    {
+        return self::ARRAY_ELEMENT_DELIMITERS[$elementType] ?? ',';
     }
     protected function convertErrorToException(string $code, string $message): Throwable
     {
@@ -392,6 +428,25 @@ class PostgresqlAdapter implements AdapterInterface
             };
         }
         return $connection;
+    }
+    public function discardConnection(): void
+    {
+        $connection = $this->connectionHandle;
+        $this->connectionHandle = null;
+        if ($connection === null) {
+            return;
+        }
+        try {
+            // On a persistent connection the pooled backend session survives close(),
+            // so reset its state first; pg_connection_reset() is the correct primitive
+            // after a failed ROLLBACK (DISCARD ALL cannot run inside a transaction).
+            if (Config::DB_PERSIST) {
+                @pg_connection_reset($connection);
+            }
+            @pg_close($connection);
+        } catch (Throwable) {
+            // discardConnection() must never throw: the handle is already dropped.
+        }
     }
     public function getEscapedValue(mixed $value): string
     {

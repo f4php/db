@@ -10,13 +10,15 @@ use F4\Config;
 use F4\DB\{
     QueryBuilderInterface,
     Adapter\AdapterInterface,
+    Exception\RollbackFailedException,
 };
 
 use function
     array_map,
     implode,
     is_array,
-    is_string
+    is_string,
+    sprintf
 ;
 
 /**
@@ -80,20 +82,47 @@ class DBTransaction
     }
     public function commit(): mixed
     {
+        if ($this->queries === []) {
+            throw new BadMethodCallException('Cannot commit a transaction in uncertain state or with no queued queries');
+        }
+
+        $runQuery = function (QueryBuilderInterface $query): mixed {
+            $preparedStatement = $query->getPreparedStatement($this->adapter->enumerateParameters(...));
+            return $this->adapter->execute($preparedStatement);
+        };
+        // BEGIN runs outside the try/catch: if it fails, this transaction never
+        // started, so we must not roll back — the connection may already be inside
+        // a transaction owned by the caller. Rethrow without touching it.
+        $beginResult = $runQuery(DB::raw('BEGIN'));
         try {
-            return array_map(
-                callback: function (QueryBuilderInterface $query): mixed {
-                    $preparedStatement = $query->getPreparedStatement($this->adapter->enumerateParameters(...));
-                    return $this->adapter->execute($preparedStatement);
-                },
-                array: $this->getQueries(),
-            );
+            return [
+                $beginResult,
+                ...array_map(callback: $runQuery, array: $this->queries),
+                $runQuery(DB::raw('COMMIT')),
+            ];
         } catch (Throwable $e) {
             try {
-                $query = DB::raw('ROLLBACK');
-                $this->adapter->execute($query->getPreparedStatement());
-            } catch (Throwable) {
-                // Preserve the exception that caused the transaction to fail
+                $runQuery(DB::raw('ROLLBACK'));
+            } catch (Throwable $rollbackError) {
+                // prevent replay on transaction in uncertain state
+                $this->queries = [];
+                // ROLLBACK failed: the connection may be left in a dirty transactional
+                // state. Discard it so the poisoned handle is never reused, then surface
+                // the rollback failure as the primary error (more severe than the query
+                // failure), keeping the original query error available via getPrevious().
+                // discardConnection() is contractually non-throwing, but a third-party
+                // adapter could violate that; swallow any such error so it cannot mask
+                // both the query failure and the rollback failure below.
+                try {
+                    $this->adapter->discardConnection();
+                } catch (Throwable) {
+                    // Best-effort discard; the RollbackFailedException below is preserved.
+                }
+                throw new RollbackFailedException(
+                    message: sprintf('Transaction rollback failed: %s', $rollbackError->getMessage()),
+                    code: 500,
+                    previous: $e,
+                );
             }
             throw $e;
         }

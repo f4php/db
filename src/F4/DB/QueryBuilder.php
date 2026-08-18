@@ -6,10 +6,12 @@ namespace F4\DB;
 
 use
     BadMethodCallException,
-    InvalidArgumentException
+    InvalidArgumentException,
+    Throwable
 ;
 use F4\DB\{
     Adapter\AdapterInterface,
+    Exception\PostSubmitHookException,
     AssignmentCollection,
     ConditionCollection,
     DelimitedIdentifier,
@@ -126,7 +128,14 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
         $preparedStatement = $this->getPreparedStatement($this->adapter->enumerateParameters(...));
         HookManager::triggerHook(HookManager::BEFORE_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters]);
         $result = $this->adapter->execute($preparedStatement, $stopAfter);
-        HookManager::triggerHook(HookManager::AFTER_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters, 'result' => $result]);
+        try {
+            HookManager::triggerHook(HookManager::AFTER_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters, 'result' => $result]);
+        } catch (Throwable $hookError) {
+            // The database operation already succeeded and is committed; a failing
+            // post-submit observer must not masquerade as a database failure. Re-throw
+            // as a distinct, non-retriable exception that carries the successful result.
+            throw new PostSubmitHookException($result, $hookError);
+        }
         return $result;
     }
     public function createIndex(...$arguments): static
@@ -494,22 +503,23 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     {
         array_map(
             callback: function ($argument) {
-                if (is_array($argument)) {
-                    $existingFieldsFragmentCollection = $this->findFragmentCollectionByName('insert_fields');
-                    $existingValuesFragmentCollection = $this->findFragmentCollectionByName('insert_values');
-                    if ($existingFieldsFragmentCollection && $existingValuesFragmentCollection) {
-                        $existingFieldsFragmentCollection
-                            ->findFragmentCollectionByName('insert_fields_collection')
-                            ->append(new SimpleColumnReferenceCollection(...array_keys($argument)));
-                        $existingValuesFragmentCollection
-                            ->findFragmentCollectionByName('insert_values_collection')
-                            ->append(new ValueExpressionCollection(...array_values($argument)));
-                    } else {
-                        $this
-                            ->append(new Parenthesize(new SimpleColumnReferenceCollection(...array_keys($argument))->withName('insert_fields_collection'))->withName('insert_fields'))
-                            ->append(new Parenthesize(new ValueExpressionCollection(...array_values($argument))->withName('insert_values_collection'))->withPrefix('VALUES')->withName('insert_values'));
-                    };
+                if (!is_array($argument)) {
+                    throw new InvalidArgumentException('values() expects associative array arguments mapping columns to values, got ' . get_debug_type($argument));
                 }
+                $existingFieldsFragmentCollection = $this->findFragmentCollectionByName('insert_fields');
+                $existingValuesFragmentCollection = $this->findFragmentCollectionByName('insert_values');
+                if ($existingFieldsFragmentCollection && $existingValuesFragmentCollection) {
+                    $existingFieldsFragmentCollection
+                        ->findFragmentCollectionByName('insert_fields_collection')
+                        ->append(new SimpleColumnReferenceCollection(...array_keys($argument)));
+                    $existingValuesFragmentCollection
+                        ->findFragmentCollectionByName('insert_values_collection')
+                        ->append(new ValueExpressionCollection(...array_values($argument)));
+                } else {
+                    $this
+                        ->append(new Parenthesize(new SimpleColumnReferenceCollection(...array_keys($argument))->withName('insert_fields_collection'))->withName('insert_fields'))
+                        ->append(new Parenthesize(new ValueExpressionCollection(...array_values($argument))->withName('insert_values_collection'))->withPrefix('VALUES')->withName('insert_values'));
+                };
             },
             array: $arguments,
         );

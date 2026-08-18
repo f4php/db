@@ -24,6 +24,7 @@ final class MockAdapter implements AdapterInterface
     {
         return [];
     }
+    public function discardConnection(): void {}
     public function enumerateParameters(int $index): string
     {
         return sprintf('$%d', $index);

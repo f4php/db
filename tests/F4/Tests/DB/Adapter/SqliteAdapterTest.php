@@ -175,6 +175,49 @@ final class SqliteAdapterTest extends TestCase
         $this->assertSame('?', $this->adapter()->enumerateParameters(42));
     }
 
+    public function testDiscardConnectionClosesHandleAndReconnectsLazily(): void
+    {
+        // Use a temp file so the database survives the connection being dropped; a
+        // :memory: database would be destroyed on close and could not prove reconnection.
+        $path = tempnam(sys_get_temp_dir(), 'sqlite-discard-');
+        $this->assertIsString($path);
+        try {
+            $adapter = new SqliteAdapter($path);
+            $adapter->execute(new PreparedStatement('CREATE TABLE t (id INTEGER)', []));
+            $adapter->execute(new PreparedStatement('INSERT INTO t VALUES (1)', []));
+
+            // Capture the live handle so we can prove it was actually closed.
+            $connectionProperty = new \ReflectionProperty(SqliteAdapter::class, 'connectionHandle');
+            $adapter->execute(new PreparedStatement('SELECT 1', [])); // force connect
+            $handleBefore = $connectionProperty->getValue($adapter);
+            $this->assertInstanceOf(\SQLite3::class, $handleBefore);
+
+            $adapter->discardConnection();
+
+            // Local handle is dropped; querying a closed SQLite3 handle throws.
+            $this->assertNull($connectionProperty->getValue($adapter));
+            $this->expectExceptionOnClosedHandle($handleBefore);
+
+            // The next operation transparently opens a fresh connection to the same file
+            // and reads the previously committed row.
+            $rows = $adapter->execute(new PreparedStatement('SELECT id FROM t', []));
+            $this->assertSame([['id' => 1]], $rows);
+            $this->assertNotSame($handleBefore, $connectionProperty->getValue($adapter));
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    private function expectExceptionOnClosedHandle(\SQLite3 $handle): void
+    {
+        try {
+            $handle->querySingle('SELECT 1');
+            $this->fail('Expected the discarded SQLite3 handle to be closed.');
+        } catch (\Throwable) {
+            $this->addToAssertionCount(1);
+        }
+    }
+
     private function duplicateResultQuery(): QueryBuilderInterface
     {
         return DB::raw('SELECT 1 AS id, 2 AS id')->useAdapter($this->adapter());

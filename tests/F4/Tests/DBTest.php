@@ -87,6 +87,16 @@ final class DBTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         DB::select()->from(['({#}) AS "t1"' => 1]);
     }
+    public function testInvalidValuesString(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        DB::insert()->into('table1 t1')->values('ignored');
+    }
+    public function testInvalidValuesScalar(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        DB::insert()->into('table1 t1')->values(42);
+    }
     public function testSimpleWhere(): void
     {
         $db1 = DB::select()->from('table')->where(['a' => 5, 'b' => ['a', 4, 'def'], '"g" > {#}' => 6]);

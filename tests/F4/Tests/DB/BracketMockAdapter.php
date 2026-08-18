@@ -22,6 +22,7 @@ final class BracketMockAdapter implements AdapterInterface
     {
         return [];
     }
+    public function discardConnection(): void {}
     public function enumerateParameters(int $index): string
     {
         return '?';

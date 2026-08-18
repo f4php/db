@@ -96,6 +96,8 @@ host='localhost' port='5432' dbname='application' user='app' password='secret'
 
 If `DB_HOST` begins with `/`, it is treated as a Unix-socket directory and `DB_PORT` is omitted. `DB_CHARSET`, `DB_SCHEMA`, `DB_APP_NAME`, and `TIMEZONE` are applied after connecting, and `DB_PERSIST` selects persistent or non-persistent PostgreSQL connections.
 
+> **Transactions and persistent connections.** If a transaction's `ROLLBACK` itself fails, the connection may be left in a dirty transactional state. The adapter drops its local connection handle and attempts driver-specific cleanup — PostgreSQL calls `pg_connection_reset()` on persistent connections — after which the next operation opens a new connection. This only affects the adapter's own handle: with persistent connections the underlying backend session may be pooled and reused, so a clean session cannot be *guaranteed* after a failed rollback. Transaction-critical deployments should set `DB_PERSIST = false`.
+
 #### SQLite configuration
 
 For SQLite, `DB_NAME` is the database filename. Use `:memory:` for an in-memory database:
@@ -155,6 +157,8 @@ partially interpreted as connection options. Generated strings apply these
 rules automatically using `DB_CHARSET` so multibyte characters remain intact.
 
 `DB_CHARSET` is applied with `mysqli::set_charset()`, `TIMEZONE` is applied as the session `time_zone`, and `DB_PERSIST` controls the `mysqli` persistent-host prefix. `DB_SCHEMA` and `DB_APP_NAME` are not used by `MysqlAdapter`.
+
+> **Transactions and persistent connections.** MySQL exposes no usable connection-reset primitive, so after a failed transaction `ROLLBACK` the adapter can only close and discard the connection — a pooled persistent session cannot be reset. Set `DB_PERSIST = false` for transaction-critical deployments.
 
 #### Optional-adapter SQL compatibility
 
@@ -651,6 +655,11 @@ The **PostgreSQL adapter** automatically applies the following casting rules:
     default:
   }
 ```
+
+Array columns (e.g. `integer[]`, `text[]`) are returned as fully-typed, nested PHP arrays. The adapter detects array columns by the underscore-prefixed type name that `pg_field_type()` reports (`_int4`, `_text`, ...), parses the array literal via `F4\DB\Adapter\PostgresqlAdapter\ArrayParser`, and applies the casting rules above to each element. `NULL` elements become PHP `null`, and multi-dimensional arrays are returned as nested arrays. A malformed array literal raises `InvalidResultValueException`.
+
+The element delimiter is resolved from the element type: `,` for every built-in type except `box`, whose arrays use `;` (PostgreSQL's `pg_type.typdelim`). To support a user-defined type that declares a non-default delimiter, override `resolveArrayDelimiter()` on the adapter.
+
 ## Best Practices
 
 - **Always use placeholders for user input** - Never concatenate values into SQL strings to prevent SQL injection

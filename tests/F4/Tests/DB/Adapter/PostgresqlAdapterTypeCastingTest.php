@@ -60,6 +60,60 @@ final class PostgresqlAdapterTypeCastingTest extends TestCase
 
         (new TestablePostgresqlTypeCastingAdapter())->castResultValue(['t', ['unexpected']], 'bool');
     }
+
+    public function testParsesAndCastsIntegerArrayColumn(): void
+    {
+        $adapter = new TestablePostgresqlTypeCastingAdapter();
+
+        $this->assertSame([1, 2, 3], $adapter->castResultValue('{1,2,3}', '_int4'));
+    }
+
+    public function testParsesAndCastsBooleanArrayColumnWithNull(): void
+    {
+        $adapter = new TestablePostgresqlTypeCastingAdapter();
+
+        $this->assertSame([true, false, null], $adapter->castResultValue('{t,f,NULL}', '_bool'));
+    }
+
+    public function testParsesAndCastsFloatArrayColumn(): void
+    {
+        $adapter = new TestablePostgresqlTypeCastingAdapter();
+
+        $this->assertSame([1.25, 2.5], $adapter->castResultValue('{1.25,2.5}', '_float8'));
+    }
+
+    public function testParsesTextArrayColumnPreservingDelimiters(): void
+    {
+        $adapter = new TestablePostgresqlTypeCastingAdapter();
+
+        $this->assertSame(['a,b', 'c'], $adapter->castResultValue('{"a,b",c}', '_text'));
+    }
+
+    public function testParsesNestedIntegerArrayColumn(): void
+    {
+        $adapter = new TestablePostgresqlTypeCastingAdapter();
+
+        $this->assertSame([[1, 2], [3, 4]], $adapter->castResultValue('{{1,2},{3,4}}', '_int4'));
+    }
+
+    public function testParsesBoxArrayColumnWithSemicolonDelimiter(): void
+    {
+        $adapter = new TestablePostgresqlTypeCastingAdapter();
+
+        // box[] uses ';' as its element delimiter; the commas inside each box are literal.
+        $this->assertSame(
+            ['(1,1),(0,0)', '(2,2),(1,1)'],
+            $adapter->castResultValue('{(1,1),(0,0);(2,2),(1,1)}', '_box'),
+        );
+    }
+
+    public function testWrapsMalformedArrayLiteralAsInvalidResultValue(): void
+    {
+        $this->expectException(InvalidResultValueException::class);
+        $this->expectExceptionMessage('Malformed PostgreSQL array literal');
+
+        (new TestablePostgresqlTypeCastingAdapter())->castResultValue('{1,2', '_int4');
+    }
 }
 
 final class TestablePostgresqlTypeCastingAdapter extends PostgresqlAdapter
