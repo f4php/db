@@ -547,12 +547,23 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     }
     public function with(...$arguments): static
     {
-        $this->append(new WithTableReferenceCollection(...$arguments)->withPrefix('WITH'));
+        match ($existingNamedFragmentCollection = $this->findFragmentCollectionByName('with')) {
+            null => $this
+                ->append(new WithTableReferenceCollection(...$arguments)->withPrefix('WITH')->withName('with')),
+            default => $existingNamedFragmentCollection
+                ->append(new WithTableReferenceCollection(...$arguments))
+        };
         return $this;
     }
     public function withRecursive(...$arguments): static
     {
-        $this->append(new WithTableReferenceCollection(...$arguments)->withPrefix('WITH RECURSIVE'));
+        match ($existingNamedFragmentCollection = $this->findFragmentCollectionByName('with')) {
+            null => $this
+                ->append(new WithTableReferenceCollection(...$arguments)->withPrefix('WITH RECURSIVE')->withName('with')),
+            default => $existingNamedFragmentCollection
+                ->withPrefix('WITH RECURSIVE')
+                ->append(new WithTableReferenceCollection(...$arguments))
+        };
         return $this;
     }
 }

@@ -128,6 +128,30 @@ final class DBTest extends TestCase
         $db1 = DB::with(['table' => DB::select()->from('t')])->select()->from('table');
         $this->assertSame('WITH "table" AS (SELECT * FROM "t") SELECT * FROM "table"', $db1->getPreparedStatement()->query);
     }
+    public function testConsecutiveWith(): void
+    {
+        $db1 = DB::with(['a' => DB::select()->from('t1')])
+            ->with(['b' => DB::select()->from('t2')])
+            ->with(['c' => DB::select()->from('t3'), 'd' => DB::select()->from('t4')])
+            ->select()->from('a');
+        $this->assertSame('WITH "a" AS (SELECT * FROM "t1"), "b" AS (SELECT * FROM "t2"), "c" AS (SELECT * FROM "t3"), "d" AS (SELECT * FROM "t4") SELECT * FROM "a"', $db1->getPreparedStatement()->query);
+        $db2 = DB::withRecursive(['a' => DB::select()->from('t1')])
+            ->with(['b' => DB::select()->from('t2')])
+            ->select()->from('a');
+        $this->assertSame('WITH RECURSIVE "a" AS (SELECT * FROM "t1"), "b" AS (SELECT * FROM "t2") SELECT * FROM "a"', $db2->getPreparedStatement()->query);
+        $db3 = DB::with(['a' => DB::select()->from('t1')])
+            ->withRecursive(['b' => DB::select()->from('t2')])
+            ->select()->from('a');
+        $this->assertSame('WITH RECURSIVE "a" AS (SELECT * FROM "t1"), "b" AS (SELECT * FROM "t2") SELECT * FROM "a"', $db3->getPreparedStatement()->query);
+        $db4 = DB::with(['a' => DB::select()->from('t1')->where(['x' => 1])])
+            ->with(['b' => DB::select()->from('t2')->where(['y' => 2])])
+            ->select()->from('a')->where(['z' => 3]);
+        $this->assertSame('WITH "a" AS (SELECT * FROM "t1" WHERE "x" = $1), "b" AS (SELECT * FROM "t2" WHERE "y" = $2) SELECT * FROM "a" WHERE "z" = $3', $db4->getPreparedStatement()->query);
+        $this->assertSame([1, 2, 3], $db4->getPreparedStatement()->parameters);
+        $db5 = DB::with(['a' => DB::select()->from('t1')])->select()->from('a')
+            ->union()->with(['b' => DB::select()->from('t2')])->select()->from('b');
+        $this->assertSame('WITH "a" AS (SELECT * FROM "t1") SELECT * FROM "a" UNION WITH "b" AS (SELECT * FROM "t2") SELECT * FROM "b"', $db5->getPreparedStatement()->query);
+    }
     public function testUnionExceptIntersect(): void
     {
         $db1 = DB::select()->from('t1')->union()->select()->from('t2');
