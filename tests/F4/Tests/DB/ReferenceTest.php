@@ -10,6 +10,7 @@ use F4\DB\Reference\ColumnReferenceWithAlias;
 use F4\DB\Reference\SimpleReference;
 use F4\DB\Reference\TableReference;
 use F4\DB\Reference\TableReferenceWithAlias;
+use F4\DB\Reference\TableWildcardReference;
 
 final class ReferenceTest extends TestCase
 {
@@ -28,12 +29,17 @@ final class ReferenceTest extends TestCase
         $this->assertSame('"someTable"', $reference4->getQuery($adapter));
         $reference5 = new TableReferenceWithAlias(' someTable t1');
         $this->assertSame('"someTable" AS "t1"', $reference5->getQuery($adapter));
+        $reference6 = new TableWildcardReference(' someTable . * ');
+        $this->assertSame('"someTable".*', $reference6->getQuery($adapter));
     }
 
     public function testGetDelimitedSignalsRecognition(): void
     {
         $this->assertNotNull(new ColumnReference('t.col')->getDelimited());
         $this->assertNull(new ColumnReference('a > 1')->getDelimited());
+        $this->assertNotNull(new TableWildcardReference('t.*')->getDelimited());
+        $this->assertNull(new TableWildcardReference('*')->getDelimited());
+        $this->assertNull(new TableWildcardReference('t.col')->getDelimited());
     }
 
     public function testGetPreparedStatementRendersReferenceViaAdapter(): void
