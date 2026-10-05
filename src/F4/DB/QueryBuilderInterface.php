@@ -29,6 +29,7 @@ interface QueryBuilderInterface extends FragmentCollectionInterface, FragmentInt
     public function createMaterializedView(...$arguments): static;
     public function createMaterializedViewIfNotExists(...$arguments): static;
     public function commit(?int $stopAfter = null): array;
+    public function concealing(...$arguments): static;
     public function crossJoin(...$arguments): static;
     public function crossJoinLateral(...$arguments): static;
     public function delete(): static;
@@ -73,6 +74,7 @@ interface QueryBuilderInterface extends FragmentCollectionInterface, FragmentInt
     public function orderBy(...$arguments): static;
     public function raw(...$arguments): static;
     public function returning(...$arguments): static;
+    public function revealing(...$arguments): static;
     public function rightJoin(...$arguments): static;
     public function rightOuterJoin(...$arguments): static;
     public function select(...$arguments): static;

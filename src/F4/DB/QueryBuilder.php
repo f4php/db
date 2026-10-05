@@ -11,6 +11,7 @@ use
 ;
 use F4\DB\{
     Adapter\AdapterInterface,
+    Exception\ConcealedColumnNotFoundException,
     Exception\PostSubmitHookException,
     AssignmentCollection,
     ConditionCollection,
@@ -35,11 +36,15 @@ use F4\{
 };
 
 use function
+    array_diff_key,
     array_key_exists,
     array_keys,
     array_map,
     array_values,
+    array_walk_recursive,
     count,
+    get_debug_type,
+    implode,
     is_array,
     is_int,
     is_string,
@@ -49,6 +54,8 @@ use function
 class QueryBuilder extends FragmentCollection implements FragmentInterface, FragmentCollectionInterface, QueryBuilderInterface
 {
     protected AdapterInterface $adapter;
+    /** @var array<string, true> result keys removed from every returned row */
+    protected array $concealedKeys = [];
     public function __construct(?string $connectionString = null, string|AdapterInterface $adapter = Config::DB_ADAPTER_CLASS)
     {
         $this->adapter = match (is_string($adapter)) {
@@ -127,7 +134,8 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     {
         $preparedStatement = $this->getPreparedStatement($this->adapter->enumerateParameters(...));
         HookManager::triggerHook(HookManager::BEFORE_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters]);
-        $result = $this->adapter->execute($preparedStatement, $stopAfter);
+        // Concealment is applied before any observer sees the result
+        $result = $this->applyConcealment($this->adapter->execute($preparedStatement, $stopAfter));
         try {
             HookManager::triggerHook(HookManager::AFTER_SQL_SUBMIT, ['statement' => $preparedStatement->query, 'parameters' => $preparedStatement->parameters, 'result' => $result]);
         } catch (Throwable $hookError) {
@@ -137,6 +145,49 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
             throw new PostSubmitHookException($result, $hookError);
         }
         return $result;
+    }
+    public function concealing(...$arguments): static
+    {
+        foreach ($this->normalizeConcealmentKeys($arguments) as $key) {
+            $this->concealedKeys[$key] = true;
+        }
+        return $this;
+    }
+    protected function normalizeConcealmentKeys(array $arguments): array
+    {
+        $keys = [];
+        array_walk_recursive(
+            $arguments,
+            function (mixed $key) use (&$keys): void {
+                if (!is_string($key) || $key === '') {
+                    throw new InvalidArgumentException('concealing() and revealing() expect non-empty string keys, got ' . get_debug_type($key));
+                }
+                $keys[] = $key;
+            },
+        );
+        return $keys;
+    }
+    protected function applyConcealment(array $result): array
+    {
+        if (empty($this->concealedKeys)) {
+            return $result;
+        }
+        if (Config::DB_STRICT_CONCEAL && is_array($firstRow = $result[0] ?? null)) {
+            $missingKeys = array_diff_key($this->concealedKeys, $firstRow);
+            if (!empty($missingKeys)) {
+                throw new ConcealedColumnNotFoundException(sprintf(
+                    'Concealed column(s) "%s" not found in result',
+                    implode('", "', array_keys($missingKeys)),
+                ));
+            }
+        }
+        return array_map(
+            callback: fn(mixed $row): mixed => match (is_array($row)) {
+                true => array_diff_key($row, $this->concealedKeys),
+                default => $row,
+            },
+            array: $result,
+        );
     }
     public function createIndex(...$arguments): static
     {
@@ -446,6 +497,13 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     public function returning(...$arguments): static
     {
         $this->append(new SimpleColumnReferenceCollection($arguments ?: '*')->withPrefix('RETURNING'));
+        return $this;
+    }
+    public function revealing(...$arguments): static
+    {
+        foreach ($this->normalizeConcealmentKeys($arguments) as $key) {
+            unset($this->concealedKeys[$key]);
+        }
         return $this;
     }
     public function rightJoin(...$arguments): static

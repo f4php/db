@@ -12,6 +12,7 @@
 - [WHERE Clauses](#where-clauses)
 - [Common Operations](#common-operations)
 - [Getting Results](#getting-results)
+- [Concealing Sensitive Columns](#concealing-sensitive-columns)
 - [Data Types](#data-types)
 - [Best Practices](#best-practices)
 - [Common Pitfalls](#common-pitfalls)
@@ -69,6 +70,7 @@ class Config {
     public const string DB_ADAPTER_CLASS = \F4\DB\Adapter\PostgresqlAdapter::class;
     public const bool DB_PERSIST = true;
     public const bool DB_OVERWRITE_DUPLICATE_RESPONSE_COLUMNS = false;
+    public const bool DB_STRICT_CONCEAL = true;
     public const bool DEBUG_MODE = true;
     public const string TIMEZONE = '';
 }
@@ -604,6 +606,66 @@ unique. For legacy compatibility,
 `DB_OVERWRITE_DUPLICATE_RESPONSE_COLUMNS = true` disables this exception and
 restores last-column-wins overwriting; it is disabled by default because that
 behavior can silently discard data.
+
+## Concealing Sensitive Columns
+
+`concealing()` removes keys from every returned row, and `revealing()` puts them
+back. This lets a model-level class author a query so sensitive columns never
+reach its consumers, while still allowing intentional, explicit access (for
+example, an administration UI editing that data).
+
+```php
+class User
+{
+    public static function query(): QueryBuilderInterface
+    {
+        return DB::select()->from('user')->concealing('password_hash', 'totp_secret');
+    }
+}
+
+User::query()->where(['id' => 5])->asRow();
+// ['id' => 5, 'name' => '...'] - no password_hash, no totp_secret
+
+User::query()->where(['id' => 5])->revealing('totp_secret')->asRow();
+// ['id' => 5, 'name' => '...', 'totp_secret' => '...']
+```
+
+Both methods accept strings, arrays of strings (nested arrays are flattened, array
+keys are ignored), or any mix of them as variadic arguments. Anything else, including
+an empty string, throws `InvalidArgumentException`.
+
+Both methods mutate the same state, so the last call for a given key wins:
+
+```php
+->concealing('a')->revealing('a')                   // a is revealed
+->concealing('a')->revealing('a')->concealing('a')  // a is concealed
+```
+
+Behavior details:
+
+- Keys are matched against **result column names** (output aliases) exactly as
+  returned by the database, not against SQL identifiers: conceal `password`, not
+  `u.password`. Unquoted aliases are lowercased by PostgreSQL.
+- Concealment is applied immediately after the adapter returns rows, before the
+  `AFTER_SQL_SUBMIT` hook runs, so hook subscribers and
+  `PostSubmitHookException::getResult()` never see concealed values. It applies to
+  `asTable()`, `commit()`, `asRow()` and `asValue()`; `asValue($index)` counts
+  columns after concealment, and `asValue('concealed_key')` returns `null`.
+- The generated SQL is unchanged: concealed columns are still fetched from the
+  database and still pass through adapter type casting / result converters.
+- Bound **input** parameters (as seen by `BEFORE_SQL_SUBMIT`) are not affected.
+- Concealment only applies to the builder that is executed. A concealing builder
+  embedded as a subquery or CTE contributes only its SQL.
+- Concealment prevents accidental leakage; it is not an access-control boundary.
+  Anyone holding the builder can call `revealing()`.
+
+With `DB_STRICT_CONCEAL = true` (the default, also used when the constant is not
+defined), a concealed key that is absent from a non-empty result throws
+`F4\DB\Exception\ConcealedColumnNotFoundException`, catching typos and unexpected
+aliases that would otherwise let a sensitive column through. Empty results are
+not checked. The statement has already executed when this exception is thrown,
+so do not retry writes because of it. Set `DB_STRICT_CONCEAL = false` to silently
+ignore missing keys.
 
 ## Data Types
 

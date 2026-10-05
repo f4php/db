@@ -28,6 +28,7 @@ use function str_contains;
  * @method static QueryBuilderInterface addColumnIfNotExists(...$arguments) Add column if not exists
  * @method static QueryBuilderInterface alterColumn(...$arguments) Alter column
  * @method static QueryBuilderInterface alterTableIfExists(...$arguments) Alter table if exists
+ * @method static QueryBuilderInterface concealing(...$arguments) Conceal result keys
  * @method static QueryBuilderInterface createIndex(...$arguments) Create index
  * @method static QueryBuilderInterface createIndexIfNotExists(...$arguments) Create index if not exists
  * @method static QueryBuilderInterface createTable(string $name, array $columns) Create table
@@ -78,6 +79,7 @@ use function str_contains;
  * @method static QueryBuilderInterface orderBy(...$arguments) Order by
  * @method static QueryBuilderInterface raw(...$arguments) Raw
  * @method static QueryBuilderInterface returning(...$arguments) Returning
+ * @method static QueryBuilderInterface revealing(...$arguments) Reveal concealed result keys
  * @method static QueryBuilderInterface rightJoin(...$arguments) Right join
  * @method static QueryBuilderInterface rightOuterJoin(...$arguments) Right outer join
  * @method static QueryBuilderInterface select(...$arguments) Select
@@ -97,6 +99,7 @@ use function str_contains;
  * @method QueryBuilderInterface addColumnIfNotExists(...$arguments) Add column if not exists
  * @method QueryBuilderInterface alterColumn(...$arguments) Alter column
  * @method QueryBuilderInterface alterTableIfExists(...$arguments) Alter table if exists
+ * @method QueryBuilderInterface concealing(...$arguments) Conceal result keys
  * @method QueryBuilderInterface createIndex(...$arguments) Create index
  * @method QueryBuilderInterface createIndexIfNotExists(...$arguments) Create index if not exists
  * @method QueryBuilderInterface createTable(string $name, array $columns) Create table
@@ -147,6 +150,7 @@ use function str_contains;
  * @method QueryBuilderInterface orderBy(...$arguments) Order by
  * @method QueryBuilderInterface raw(...$arguments) Raw
  * @method QueryBuilderInterface returning(...$arguments) Returning
+ * @method QueryBuilderInterface revealing(...$arguments) Reveal concealed result keys
  * @method QueryBuilderInterface rightJoin(...$arguments) Right join
  * @method QueryBuilderInterface rightOuterJoin(...$arguments) Right outer join
  * @method QueryBuilderInterface select(...$arguments) Select

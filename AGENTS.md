@@ -76,6 +76,21 @@ DB::select(['id', 'name'])
 - `asSQL()` - Get SQL string with escaped values (for debugging)
 - `getPreparedStatement()` - Get PreparedStatement object with `->query` and `->parameters`
 
+### Result Concealment
+
+- `concealing(...$keys)` - Remove keys from every returned row
+- `revealing(...$keys)` - Re-introduce previously concealed keys
+
+Both accept strings, (nested) arrays of strings, or variadic mixes, and mutate
+the same state, so the last call per key wins (`concealing('a')->revealing('a')`
+reveals `a`). Keys match result column names (output aliases), not SQL
+identifiers. Filtering runs in `QueryBuilder::commit()` right after
+`AdapterInterface::execute()` and before the `AFTER_SQL_SUBMIT` hook, so hooks and
+`PostSubmitHookException::getResult()` see concealed results; it is DBMS-agnostic
+and never changes the generated SQL. With `Config::DB_STRICT_CONCEAL` (default
+`true`, also when undefined), a concealed key missing from a non-empty result
+throws `ConcealedColumnNotFoundException`.
+
 ### Example
 
 ```php
@@ -172,6 +187,10 @@ DB::select()->from('users')->where([
 - `doNothing()` - DO NOTHING action
 - `doUpdateSet()` - DO UPDATE SET action
 - `returning()` - RETURNING clause
+
+### Result Processing
+
+- `concealing()`, `revealing()` - Omit / re-introduce result keys (see Result Concealment)
 
 ### Raw SQL
 
@@ -299,6 +318,7 @@ class Config {
     public const ?string DB_APP_NAME = null;
     public const string DB_ADAPTER_CLASS = \F4\DB\Adapter\PostgresqlAdapter::class;
     public const bool DB_PERSIST = true;
+    public const bool DB_STRICT_CONCEAL = true;
 }
 ```
 
