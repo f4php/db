@@ -11,7 +11,8 @@ use
 ;
 use F4\DB\{
     Adapter\AdapterInterface,
-    Exception\ConcealedColumnNotFoundException,
+    Concealment\Concealer,
+    Concealment\ConcealmentPath,
     Exception\PostSubmitHookException,
     AssignmentCollection,
     ConditionCollection,
@@ -36,7 +37,6 @@ use F4\{
 };
 
 use function
-    array_diff_key,
     array_key_exists,
     array_keys,
     array_map,
@@ -44,7 +44,6 @@ use function
     array_walk_recursive,
     count,
     get_debug_type,
-    implode,
     is_array,
     is_int,
     is_string,
@@ -54,8 +53,8 @@ use function
 class QueryBuilder extends FragmentCollection implements FragmentInterface, FragmentCollectionInterface, QueryBuilderInterface
 {
     protected AdapterInterface $adapter;
-    /** @var array<string, true> result keys removed from every returned row */
-    protected array $concealedKeys = [];
+    /** @var array<string, ConcealmentPath> result keys and paths removed from every returned row, by canonical path */
+    protected array $concealedPaths = [];
     public function __construct(?string $connectionString = null, string|AdapterInterface $adapter = Config::DB_ADAPTER_CLASS)
     {
         $this->adapter = match (is_string($adapter)) {
@@ -148,46 +147,29 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     }
     public function concealing(...$arguments): static
     {
-        foreach ($this->normalizeConcealmentKeys($arguments) as $key) {
-            $this->concealedKeys[$key] = true;
+        foreach ($this->normalizeConcealmentPaths($arguments) as $path) {
+            $this->concealedPaths[$path->getCanonical()] = $path;
         }
         return $this;
     }
-    protected function normalizeConcealmentKeys(array $arguments): array
+    /** @return list<ConcealmentPath> */
+    protected function normalizeConcealmentPaths(array $arguments): array
     {
-        $keys = [];
+        $paths = [];
         array_walk_recursive(
             $arguments,
-            function (mixed $key) use (&$keys): void {
-                if (!is_string($key) || $key === '') {
-                    throw new InvalidArgumentException('concealing() and revealing() expect non-empty string keys, got ' . get_debug_type($key));
+            function (mixed $key) use (&$paths): void {
+                if (!is_string($key)) {
+                    throw new InvalidArgumentException('concealing() and revealing() expect string keys or paths, got ' . get_debug_type($key));
                 }
-                $keys[] = $key;
+                $paths[] = ConcealmentPath::fromString($key);
             },
         );
-        return $keys;
+        return $paths;
     }
     protected function applyConcealment(array $result): array
     {
-        if (empty($this->concealedKeys)) {
-            return $result;
-        }
-        if (Config::DB_STRICT_CONCEAL && is_array($firstRow = $result[0] ?? null)) {
-            $missingKeys = array_diff_key($this->concealedKeys, $firstRow);
-            if (!empty($missingKeys)) {
-                throw new ConcealedColumnNotFoundException(sprintf(
-                    'Concealed column(s) "%s" not found in result',
-                    implode('", "', array_keys($missingKeys)),
-                ));
-            }
-        }
-        return array_map(
-            callback: fn(mixed $row): mixed => match (is_array($row)) {
-                true => array_diff_key($row, $this->concealedKeys),
-                default => $row,
-            },
-            array: $result,
-        );
+        return new Concealer(...array_values($this->concealedPaths))->apply($result, Config::DB_STRICT_CONCEAL);
     }
     public function createIndex(...$arguments): static
     {
@@ -501,8 +483,8 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     }
     public function revealing(...$arguments): static
     {
-        foreach ($this->normalizeConcealmentKeys($arguments) as $key) {
-            unset($this->concealedKeys[$key]);
+        foreach ($this->normalizeConcealmentPaths($arguments) as $path) {
+            unset($this->concealedPaths[$path->getCanonical()]);
         }
         return $this;
     }

@@ -82,14 +82,19 @@ DB::select(['id', 'name'])
 - `revealing(...$keys)` - Re-introduce previously concealed keys
 
 Both accept strings, (nested) arrays of strings, or variadic mixes, and mutate
-the same state, so the last call per key wins (`concealing('a')->revealing('a')`
-reveals `a`). Keys match result column names (output aliases), not SQL
-identifiers. Filtering runs in `QueryBuilder::commit()` right after
-`AdapterInterface::execute()` and before the `AFTER_SQL_SUBMIT` hook, so hooks and
-`PostSubmitHookException::getResult()` see concealed results; it is DBMS-agnostic
-and never changes the generated SQL. With `Config::DB_STRICT_CONCEAL` (default
-`true`, also when undefined), a concealed key missing from a non-empty result
-throws `ConcealedColumnNotFoundException`.
+the same state, so the last call per rule wins (`concealing('a')->revealing('a')`
+reveals `a`). Plain keys match result column names (output aliases), not SQL
+identifiers. Strings starting with `$` are paths into decoded JSON values
+(`$.leadEmployee.passwordHash`, `$.meta["a.b"]`; no wildcards or indexes); lists met
+along a path are traversed automatically, so one path covers `to_jsonb()` objects and
+`jsonb_agg()` lists. `'a'` and `'$.a'` are the same rule; rules have no hierarchy.
+Parsing lives in `Concealment\ConcealmentPath`, the walk in `Concealment\Concealer`.
+Filtering runs in `QueryBuilder::commit()` right after `AdapterInterface::execute()`
+and before the `AFTER_SQL_SUBMIT` hook, so hooks and
+`PostSubmitHookException::getResult()` see concealed results; it is DBMS-agnostic and
+never changes the generated SQL. With `Config::DB_STRICT_CONCEAL`, a key or path
+segment missing from any reached row/object, or a non-null scalar where a path must
+descend, throws `ConcealedColumnNotFoundException`; `null` and empty lists are skipped.
 
 ### Example
 

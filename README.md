@@ -631,8 +631,8 @@ User::query()->where(['id' => 5])->revealing('totp_secret')->asRow();
 ```
 
 Both methods accept strings, arrays of strings (nested arrays are flattened, array
-keys are ignored), or any mix of them as variadic arguments. Anything else, including
-an empty string, throws `InvalidArgumentException`.
+keys are ignored), or any mix of them as variadic arguments. Anything else, an empty
+string, or a malformed path (see below) throws `InvalidArgumentException`.
 
 Both methods mutate the same state, so the last call for a given key wins:
 
@@ -659,13 +659,68 @@ Behavior details:
 - Concealment prevents accidental leakage; it is not an access-control boundary.
   Anyone holding the builder can call `revealing()`.
 
-With `DB_STRICT_CONCEAL = true` (the default, also used when the constant is not
-defined), a concealed key that is absent from a non-empty result throws
-`F4\DB\Exception\ConcealedColumnNotFoundException`, catching typos and unexpected
-aliases that would otherwise let a sensitive column through. Empty results are
-not checked. The statement has already executed when this exception is thrown,
-so do not retry writes because of it. Set `DB_STRICT_CONCEAL = false` to silently
-ignore missing keys.
+### Concealing keys inside related JSON
+
+A key starting with `$` is a path into decoded JSON values, which conceals keys of
+related rows built with `to_jsonb()` or `jsonb_agg()`:
+
+```php
+DB::select([
+    'contractor.*',
+    '"employee"."relation_jsonb" AS "leadEmployee"',
+    '"employees"."relation_jsonb" AS "employees"',
+])
+    ->from('contractor')
+    ->leftJoinLateral([
+        '({#::#}) AS "employee"' => DB::select('to_jsonb("employee".*) AS "relation_jsonb"')
+            ->from('employee')
+            ->where(['"contractor"."leadEmployeeUUID" = "employee"."employeeUUID"']),
+    ])
+    ->on('true')
+    ->leftJoinLateral([
+        '({#::#}) AS "employees"' => DB::select('jsonb_agg(to_jsonb("employee".*)) AS "relation_jsonb"')
+            ->from('employee')
+            ->where(['"employee"."contractorUUID" = "contractor"."contractorUUID"']),
+    ])
+    ->on('true')
+    ->concealing('$.leadEmployee.passwordHash', '$.employees.passwordHash');
+```
+
+- Paths address the **returned row**, so the first segment is the output column
+  name (`leadEmployee`), not the SQL alias used inside the query (`employee`).
+- Syntax: `$` followed by `.name` or `["quoted name"]` segments; quoted names may
+  contain `.`, `[`, `]` and use `\"` / `\\` escapes. Wildcards and indexes are not
+  supported.
+- A string not starting with `$` is always a plain top-level key, even if it contains
+  dots. `'passwordHash'` and `'$.passwordHash'` are the same rule, so either form
+  reveals what the other conceals. Use `$["$name"]` for a column whose name starts
+  with `$`.
+- Lists are traversed automatically: the path is applied to every element, so the
+  same path works for a single related object and for a `jsonb_agg()` list.
+  Lists are never re-indexed and list elements are never removed. Because
+  `json_decode()` cannot tell them apart, a JSON object with keys `"0"`, `"1"`, ...
+  is treated as a list.
+- `null` values (e.g. a `LEFT JOIN LATERAL` without a match) and empty lists are
+  skipped.
+- Paths only descend into values the adapter has already decoded into PHP arrays.
+  The PostgreSQL and MySQL adapters decode JSON automatically; with SQLite, decode
+  JSON columns in a result converter.
+- Each path is an independent rule, matched exactly: `concealing('$.a')` followed by
+  `revealing('$.a.b')` still conceals all of `a`, and `concealing('$.a.b')` followed
+  by `revealing('$.a')` still conceals `a.b`.
+
+### Strict concealment
+
+With `DB_STRICT_CONCEAL = true` (recommended), a concealed key or path that does
+not match the result throws `F4\DB\Exception\ConcealedColumnNotFoundException`,
+catching typos and unexpected aliases that would otherwise let a sensitive value
+through. Since related JSON is expected to be built from regular tables with a
+consistent schema, the check applies everywhere: every row and every object a path
+reaches must contain the next segment, and every value a path descends into must
+be an object or a list (`null` and empty lists excepted). Empty results are not
+checked. The statement has already executed when this exception is thrown, so do
+not retry writes because of it. Set `DB_STRICT_CONCEAL = false` to silently ignore
+keys and paths that do not match.
 
 ## Data Types
 
