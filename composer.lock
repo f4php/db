@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8c1fabebbf7c2a3e8b58dd587a93e88e",
+    "content-hash": "28206d701525ee5f9ff4d9704b37c142",
     "packages": [
         {
             "name": "composer/pcre",
@@ -84,25 +84,25 @@
         },
         {
             "name": "f4php/hookmanager",
-            "version": "v0.0.2",
+            "version": "v0.0.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/f4php/hookmanager.git",
-                "reference": "27e2ace876cb58794ba5cbcc708298537953d210"
+                "reference": "ea3c56f3448221227de5d5f480a447113fa1b085"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/f4php/hookmanager/zipball/27e2ace876cb58794ba5cbcc708298537953d210",
-                "reference": "27e2ace876cb58794ba5cbcc708298537953d210",
+                "url": "https://api.github.com/repos/f4php/hookmanager/zipball/ea3c56f3448221227de5d5f480a447113fa1b085",
+                "reference": "ea3c56f3448221227de5d5f480a447113fa1b085",
                 "shasum": ""
             },
             "require": {
-                "php": "^8.4.1"
+                "php": "^8.4.27"
             },
             "require-dev": {
                 "phpstan/phpstan": "^2.0",
                 "phpstan/phpstan-phpunit": "^2.0",
-                "phpunit/phpunit": "^11.4"
+                "phpunit/phpunit": "^12.5"
             },
             "type": "library",
             "autoload": {
@@ -128,9 +128,9 @@
             ],
             "support": {
                 "issues": "https://github.com/f4php/hookmanager/issues",
-                "source": "https://github.com/f4php/hookmanager/tree/v0.0.2"
+                "source": "https://github.com/f4php/hookmanager/tree/v0.0.4"
             },
-            "time": "2025-12-11T20:16:04+00:00"
+            "time": "2026-10-21T14:17:41+00:00"
         }
     ],
     "packages-dev": [
