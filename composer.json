@@ -33,7 +33,7 @@
         "ext-pgsql": "*",
         "php": "^8.4.27",
         "composer/pcre": "^3.3",
-        "f4php/hookmanager": "^0.0.4"
+        "f4php/hookmanager": "^0.0.5"
     },
     "suggest": {
         "ext-mysqli": "Required to use MysqlAdapter",

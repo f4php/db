@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "28206d701525ee5f9ff4d9704b37c142",
+    "content-hash": "9f38006f98ae8440f11c0581f6f73827",
     "packages": [
         {
             "name": "composer/pcre",
@@ -84,16 +84,16 @@
         },
         {
             "name": "f4php/hookmanager",
-            "version": "v0.0.4",
+            "version": "v0.0.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/f4php/hookmanager.git",
-                "reference": "ea3c56f3448221227de5d5f480a447113fa1b085"
+                "reference": "06b806df9b240fe65c2f6bd6cba7245c5ffe1447"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/f4php/hookmanager/zipball/ea3c56f3448221227de5d5f480a447113fa1b085",
-                "reference": "ea3c56f3448221227de5d5f480a447113fa1b085",
+                "url": "https://api.github.com/repos/f4php/hookmanager/zipball/06b806df9b240fe65c2f6bd6cba7245c5ffe1447",
+                "reference": "06b806df9b240fe65c2f6bd6cba7245c5ffe1447",
                 "shasum": ""
             },
             "require": {
@@ -128,9 +128,9 @@
             ],
             "support": {
                 "issues": "https://github.com/f4php/hookmanager/issues",
-                "source": "https://github.com/f4php/hookmanager/tree/v0.0.4"
+                "source": "https://github.com/f4php/hookmanager/tree/v0.0.5"
             },
-            "time": "2026-10-21T14:17:41+00:00"
+            "time": "2026-10-27T21:34:09+00:00"
         }
     ],
     "packages-dev": [
@@ -371,11 +371,11 @@
         },
         {
             "name": "phpstan/phpstan",
-            "version": "2.3.1",
+            "version": "2.3.3",
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/6155239b488e95d26d1ebd95c6b4bb294d7f09db",
-                "reference": "6155239b488e95d26d1ebd95c6b4bb294d7f09db",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/4b57dc8ca7456b635d1661845f44bc060b02c6b0",
+                "reference": "4b57dc8ca7456b635d1661845f44bc060b02c6b0",
                 "shasum": ""
             },
             "require": {
@@ -431,7 +431,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-08T21:09:11+00:00"
+            "time": "2026-10-27T14:06:26+00:00"
         },
         {
             "name": "phpstan/phpstan-phpunit",
@@ -850,16 +850,16 @@
         },
         {
             "name": "phpunit/phpunit",
-            "version": "12.5.40",
+            "version": "12.5.42",
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/phpunit.git",
-                "reference": "76bd3198f16aeb375a4d5f3626471445aed0966e"
+                "reference": "1d6dbe748c079e5d2b03bca1be69d0f4cc52a578"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/76bd3198f16aeb375a4d5f3626471445aed0966e",
-                "reference": "76bd3198f16aeb375a4d5f3626471445aed0966e",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/1d6dbe748c079e5d2b03bca1be69d0f4cc52a578",
+                "reference": "1d6dbe748c079e5d2b03bca1be69d0f4cc52a578",
                 "shasum": ""
             },
             "require": {
@@ -928,7 +928,7 @@
             "support": {
                 "issues": "https://github.com/sebastianbergmann/phpunit/issues",
                 "security": "https://github.com/sebastianbergmann/phpunit/security/policy",
-                "source": "https://github.com/sebastianbergmann/phpunit/tree/12.5.40"
+                "source": "https://github.com/sebastianbergmann/phpunit/tree/12.5.42"
             },
             "funding": [
                 {
@@ -936,7 +936,7 @@
                     "type": "other"
                 }
             ],
-            "time": "2026-10-16T05:55:07+00:00"
+            "time": "2026-10-27T04:15:03+00:00"
         },
         {
             "name": "sebastian/cli-parser",

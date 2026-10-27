@@ -12,7 +12,10 @@ use Closure,
     SQLite3Result,
     SQLite3Stmt,
     Throwable;
-use F4\Config;
+use F4\{
+    Config,
+    HookManager,
+};
 use F4\DB\Exception\{
     DuplicateColumnException,
     DuplicateRecordException,
@@ -90,10 +93,12 @@ class SqliteAdapter implements AdapterInterface
     public function connect(string $connectionString, int $connectionFlags = 0): SQLite3
     {
         try {
+            HookManager::triggerHook(HookManager::BEFORE_DB_CONNECT, ['connectionString' => $connectionString, 'connectionFlags' => $connectionFlags]);
             $connection = new SQLite3(
                 filename: $connectionString,
                 flags: $connectionFlags ?: (SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE),
             );
+            HookManager::triggerHook(HookManager::AFTER_DB_CONNECT, ['connection' => $connection]);
             $this->configureConnection($connection);
             return $connection;
         } catch (Throwable $exception) {

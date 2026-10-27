@@ -12,7 +12,10 @@ use Closure,
     mysqli_sql_exception,
     mysqli_stmt,
     Throwable;
-use F4\Config;
+use F4\{
+    Config,
+    HookManager,
+};
 use F4\DB\Exception\{
     DuplicateColumnException,
     DuplicateFunctionException,
@@ -172,12 +175,12 @@ class MysqlAdapter implements AdapterInterface
         $options = $this->resolveConnectionOptions($connectionString);
 
         try {
+            HookManager::triggerHook(HookManager::BEFORE_DB_CONNECT, ['connectionString' => $connectionString, 'connectionFlags' => $connectionFlags]);
             $connection = mysqli_init();
             if (!$connection instanceof mysqli) {
                 throw new DatabaseException('Failed to initialize mysqli', 500);
             }
             $connection->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, 1);
-
             $host = Config::DB_PERSIST
                 ? 'p:' . $options['host']
                 : $options['host'];
@@ -195,7 +198,7 @@ class MysqlAdapter implements AdapterInterface
                     code: 500,
                 );
             }
-
+            HookManager::triggerHook(HookManager::AFTER_DB_CONNECT, ['connection' => $connection]);
             $this->configureConnection($connection, $options['charset']);
             return $connection;
         } catch (mysqli_sql_exception $exception) {

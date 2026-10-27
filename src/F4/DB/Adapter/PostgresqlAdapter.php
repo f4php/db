@@ -9,7 +9,10 @@ use DateTimeInterface,
     ErrorException,
     InvalidArgumentException,
     Throwable;
-use F4\Config;
+use F4\{
+    Config,
+    HookManager,
+};
 use F4\DB\Adapter\AdapterInterface;
 use F4\DB\Exception\{
     DuplicateColumnException,
@@ -393,6 +396,7 @@ class PostgresqlAdapter implements AdapterInterface
     {
         $connection = null;
         try {
+            HookManager::triggerHook(HookManager::BEFORE_DB_CONNECT, ['connectionString' => $connectionString, 'connectionFlags' => $connectionFlags]);
             $connection = match (Config::DB_PERSIST) {
                 true => @pg_pconnect(connection_string: $connectionString, flags: $connectionFlags),
                 default => @pg_connect(connection_string: $connectionString, flags: $connectionFlags)
@@ -400,6 +404,7 @@ class PostgresqlAdapter implements AdapterInterface
             if ((false === $connection) || (pg_connection_status(connection: $connection) !== PGSQL_CONNECTION_OK)) {
                 throw new ErrorException('Database connection failed', 500);
             }
+            HookManager::triggerHook(HookManager::AFTER_DB_CONNECT, ['connection' => $connection]);
         } catch (ErrorException $e) {
             match (Config::DEBUG_MODE && ($connection !== false)) {
                 true => throw new ErrorException(message: sprintf("Database connection error: %s", pg_last_error($connection)), code: 500, previous: $e),
