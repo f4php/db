@@ -324,6 +324,28 @@ final class DBTest extends TestCase
         $db9 = DB::select()->from('t1')->groupByDistinct(['a'])->groupBy(['b', 'c'])->having(['d > {#}' => 7]);
         $this->assertSame('SELECT * FROM "t1" GROUP BY DISTINCT ("a", "b", "c") HAVING d > $1', $db9->getPreparedStatement()->query);
     }
+    public function testConsecutiveSelect(): void
+    {
+        $db1 = DB::select('a')->select(['b', 'c d'])->from('t1')->where(['x' => 1]);
+        $this->assertSame('SELECT "a", "b", "c" AS "d" FROM "t1" WHERE "x" = $1', $db1->getPreparedStatement()->query);
+        $db2 = DB::select('a')->from('t1')->select(['"b" + {#}' => 5])->where(['x' => 1]);
+        $this->assertSame('SELECT "a", "b" + $1 FROM "t1" WHERE "x" = $2', $db2->getPreparedStatement()->query);
+        $this->assertSame([5, 1], $db2->getPreparedStatement()->parameters);
+        $db3 = DB::select('a')->selectDistinct('b')->from('t1');
+        $this->assertSame('SELECT DISTINCT "a", "b" FROM "t1"', $db3->getPreparedStatement()->query);
+        $db4 = DB::selectDistinct('a')->select('b')->from('t1');
+        $this->assertSame('SELECT DISTINCT "a", "b" FROM "t1"', $db4->getPreparedStatement()->query);
+        $db5 = DB::select('a')->select()->from('t1');
+        $this->assertSame('SELECT "a" FROM "t1"', $db5->getPreparedStatement()->query);
+        $db6 = DB::select('a')->from('t1')->where(['x' => 1])->union()->select('b')->select('c')->from('t2')->where(['y' => 2]);
+        $this->assertSame('SELECT "a" FROM "t1" WHERE "x" = $1 UNION SELECT "b", "c" FROM "t2" WHERE "y" = $2', $db6->getPreparedStatement()->query);
+        foreach (['intersect' => 'INTERSECT', 'intersectAll' => 'INTERSECT ALL', 'except' => 'EXCEPT', 'exceptAll' => 'EXCEPT ALL'] as $method => $keyword) {
+            $db = DB::select('a')->from('t1')->where(['x' => 1])->$method()->select('b')->from('t2')->where(['y' => 2]);
+            $this->assertSame("SELECT \"a\" FROM \"t1\" WHERE \"x\" = \$1 {$keyword} SELECT \"b\" FROM \"t2\" WHERE \"y\" = \$2", $db->getPreparedStatement()->query);
+        }
+        $db7 = DB::with(['w' => DB::select('a')->from('t1')])->select('a')->select('b')->from('w');
+        $this->assertSame('WITH "w" AS (SELECT "a" FROM "t1") SELECT "a", "b" FROM "w"', $db7->getPreparedStatement()->query);
+    }
     public function testAsSQL(): void
     {
         $db1 = DB::select()->from('table t1')->where(["a" => 1])->where(['b' => [2, 3, 4]])->where(['d' => true, 'e' => null]);

@@ -156,7 +156,7 @@ DB::select()->from('users')->where([
 
 ### Query Types
 
-- `select()`, `selectDistinct()` - SELECT statements
+- `select()`, `selectDistinct()` - SELECT statements (consecutive calls extend one SELECT list, like `where()`; `selectDistinct()` upgrades it to DISTINCT; a set operation starts a new list)
 - `insert()` - INSERT statements
 - `update()` - UPDATE statements
 - `delete()` - DELETE statements

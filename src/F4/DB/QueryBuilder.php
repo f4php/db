@@ -282,12 +282,14 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     public function except(): static
     {
         $this->append('EXCEPT');
+        $this->resetAllFragmentCollectionsNames();
         return $this;
     }
     // TODO: add support for parenthesis via argumens to union() to control order of evaluation for multiple unions/intersects/excepts
     public function exceptAll(): static
     {
         $this->append('EXCEPT ALL');
+        $this->resetAllFragmentCollectionsNames();
         return $this;
     }
     public function from(...$arguments): static
@@ -367,12 +369,14 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     public function intersect(): static
     {
         $this->append('INTERSECT');
+        $this->resetAllFragmentCollectionsNames();
         return $this;
     }
     // TODO: add support for parenthesis via argumens to union() to control order of evaluation for multiple unions/intersects/excepts
     public function intersectAll(): static
     {
         $this->append('INTERSECT ALL');
+        $this->resetAllFragmentCollectionsNames();
         return $this;
     }
     public function into(...$arguments): static
@@ -500,14 +504,32 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
     }
     public function select(...$arguments): static
     {
-        $this->append(new SelectExpressionCollection($arguments ?: '*')->withPrefix('SELECT'));
-        $this->resetAllFragmentCollectionsNames();
-        return $this;
+        return $this->addSelectExpressions('SELECT', $arguments);
     }
     public function selectDistinct(...$arguments): static
     {
-        $this->append(new SelectExpressionCollection($arguments ?: '*')->withPrefix('SELECT DISTINCT'));
-        $this->resetAllFragmentCollectionsNames();
+        return $this->addSelectExpressions('SELECT DISTINCT', $arguments);
+    }
+    /**
+     * Consecutive select()/selectDistinct() calls within the same statement extend a single
+     * SELECT list (like where() does); selectDistinct() upgrades an existing list to DISTINCT.
+     * A set operation (UNION/INTERSECT/EXCEPT) starts a new statement and therefore a new list.
+     */
+    protected function addSelectExpressions(string $prefix, array $arguments): static
+    {
+        $existingNamedFragmentCollection = $this->findFragmentCollectionByName('select');
+        if ($existingNamedFragmentCollection === null) {
+            $this->resetAllFragmentCollectionsNames();
+            $this->append(new SelectExpressionCollection($arguments ?: '*')->withPrefix($prefix)->withName('select'));
+        } else {
+            if ($prefix === 'SELECT DISTINCT') {
+                $existingNamedFragmentCollection->withPrefix($prefix);
+            }
+            array_map(
+                callback: $existingNamedFragmentCollection->addExpression(...),
+                array: $arguments,
+            );
+        }
         return $this;
     }
     public function set(...$arguments): static
