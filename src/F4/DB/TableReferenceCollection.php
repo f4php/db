@@ -58,8 +58,12 @@ class TableReferenceCollection extends FragmentCollection
                     }
                 }
             }
-        } elseif ($expression instanceof FragmentInterface) {
+        } elseif ($expression instanceof QueryBuilderInterface) {
+            // A bare subquery would render as invalid SQL (unparenthesized, without an alias)
             throw new InvalidArgumentException('Subqueries must have an alias');
+        } elseif ($expression instanceof FragmentInterface) {
+            // We assume that the consumer was careful enough to specify an sql-compliant alias inside their expression
+            $this->append($expression);
         } else {
             $reference = new TableReferenceWithAlias((string) $expression)->getDelimited();
             $this->append($reference ?? new Fragment((string) $expression, []));

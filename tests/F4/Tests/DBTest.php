@@ -67,6 +67,42 @@ final class DBTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         DB::select()->from(['t1' => DB::select()->from(DB::select()->from('t3'))]);
     }
+    public function testInvalidUnaliasedSubqueries(): void
+    {
+        $cases = [
+            'from' => fn() => DB::select()->from(DB::select()->from('t2')),
+            'join' => fn() => DB::select()->from('t1')->join(DB::select()->from('t2')),
+            'leftJoinLateral' => fn() => DB::select()->from('t1')->leftJoinLateral(DB::select()->from('t2')),
+            'update' => fn() => DB::update(DB::select()->from('t2')),
+        ];
+        foreach ($cases as $method => $case) {
+            try {
+                $case();
+                $this->fail("{$method}() accepted a subquery without an alias");
+            } catch (InvalidArgumentException $e) {
+                $this->assertSame('Subqueries must have an alias', $e->getMessage());
+            }
+        }
+    }
+    public function testFragmentTableReferences(): void
+    {
+        $db1 = DB::select()->from(new Fragment('generate_series(1, {#}) AS "g"', [5]));
+        $this->assertSame('SELECT * FROM generate_series(1, $1) AS "g"', $db1->getPreparedStatement()->query);
+        $this->assertSame([5], $db1->getPreparedStatement()->parameters);
+        $db2 = DB::select()->from('table1 t1')->join(new Fragment('"table2" AS "t2"'))->on(['t2.fieldA' => 1]);
+        $this->assertSame('SELECT * FROM "table1" AS "t1" JOIN "table2" AS "t2" ON "t2"."fieldA" = $1', $db2->getPreparedStatement()->query);
+        $db3 = DB::select()->from('table1 t1')
+            ->leftJoinLateral(new Fragment('generate_series(1, {#}) AS "g"', [5]))->on('true')
+            ->where(['t1.fieldA' => 7]);
+        $this->assertSame('SELECT * FROM "table1" AS "t1" LEFT JOIN LATERAL generate_series(1, $1) AS "g" ON true WHERE "t1"."fieldA" = $2', $db3->getPreparedStatement()->query);
+        $this->assertSame([5, 7], $db3->getPreparedStatement()->parameters);
+        $db4 = DB::select()->from('table1 t1')
+            ->crossJoin(new Fragment('LATERAL ({#::#}) AS "s"', [DB::select('fieldB')->from('table2')->where(['fieldC' => 3])]));
+        $this->assertSame('SELECT * FROM "table1" AS "t1" CROSS JOIN LATERAL (SELECT "fieldB" FROM "table2" WHERE "fieldC" = $1) AS "s"', $db4->getPreparedStatement()->query);
+        $this->assertSame([3], $db4->getPreparedStatement()->parameters);
+        $db5 = DB::select()->from('table1 t1')->join(DB::escapeIdentifier('table2'))->using('fieldA');
+        $this->assertSame('SELECT * FROM "table1" AS "t1" JOIN "table2" USING ("fieldA")', $db5->getPreparedStatement()->query);
+    }
     public function testInvalidFromArray(): void
     {
         $this->expectException(InvalidArgumentException::class);
