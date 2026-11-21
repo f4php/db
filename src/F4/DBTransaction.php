@@ -88,7 +88,14 @@ class DBTransaction
 
         $runQuery = function (QueryBuilderInterface $query): mixed {
             $preparedStatement = $query->getPreparedStatement($this->adapter->enumerateParameters(...));
-            return $this->adapter->execute($preparedStatement);
+            $result = $this->adapter->execute($preparedStatement);
+            // Each query's own concealing()/revealing() rules apply to its result.
+            // This runs inside the transaction, so in strict mode an unmatched
+            // concealed key rolls the whole transaction back instead of leaking data.
+            return match (is_array($result)) {
+                true => $query->applyConcealment($result),
+                default => $result,
+            };
         };
         // BEGIN runs outside the try/catch: if it fails, this transaction never
         // started, so we must not roll back — the connection may already be inside

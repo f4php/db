@@ -167,7 +167,7 @@ class QueryBuilder extends FragmentCollection implements FragmentInterface, Frag
         );
         return $paths;
     }
-    protected function applyConcealment(array $result): array
+    public function applyConcealment(array $result): array
     {
         return new Concealer(...array_values($this->concealedPaths))->apply($result, Config::DB_STRICT_CONCEAL);
     }

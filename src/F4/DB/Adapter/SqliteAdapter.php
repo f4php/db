@@ -39,6 +39,7 @@ use function
     is_float,
     is_int,
     is_string,
+    preg_match,
     sprintf,
     str_contains,
     strtolower,
@@ -57,6 +58,7 @@ class SqliteAdapter implements AdapterInterface
     private const int SQLITE_CONSTRAINT_PRIMARY_KEY = 1555;
     private const int SQLITE_CONSTRAINT_UNIQUE = 2067;
     private const int SQLITE_RANGE = 25;
+    private const string RETURNING_SAVEPOINT = 'f4_returning';
 
     private ?SQLite3 $connectionHandle = null;
     protected SQLite3 $connection {
@@ -141,6 +143,8 @@ class SqliteAdapter implements AdapterInterface
     {
         $sqliteStatement = null;
         $result = null;
+        $savepointOpen = false;
+        $succeeded = false;
 
         try {
             $sqliteStatement = $this->connection->prepare($statement->query);
@@ -164,13 +168,27 @@ class SqliteAdapter implements AdapterInterface
                 }
             }
 
+            // SQLite3Stmt::execute() steps the statement once and then resets it, so the
+            // first fetchArray() runs it again from the start. For a write with RETURNING
+            // that applies the write twice (duplicate inserts, double increments, DELETE
+            // returning no rows). The rows of the first run cannot be read, so it runs in
+            // a savepoint that is rolled back, and only the run made by fetching persists.
+            if (!$sqliteStatement->readOnly() && preg_match('/\\bRETURNING\\b/i', $statement->query) === 1) {
+                $this->connection->exec('SAVEPOINT ' . self::RETURNING_SAVEPOINT);
+                $savepointOpen = true;
+            }
             $result = $sqliteStatement->execute();
+            if ($savepointOpen) {
+                $this->connection->exec('ROLLBACK TO ' . self::RETURNING_SAVEPOINT);
+            }
             if (!$result instanceof SQLite3Result) {
+                $succeeded = true;
                 return [];
             }
             // SQLite3 returns a result object for command statements too. Calling
             // fetchArray() on a zero-column result can execute the command again.
             if ($result->numColumns() === 0) {
+                $succeeded = true;
                 return [];
             }
 
@@ -199,6 +217,7 @@ class SqliteAdapter implements AdapterInterface
             ) {
                 $rows[] = $row;
             }
+            $succeeded = true;
             return $rows;
         } catch (SQLite3Exception $exception) {
             $code = $this->connection->lastExtendedErrorCode();
@@ -214,6 +233,37 @@ class SqliteAdapter implements AdapterInterface
             if ($sqliteStatement instanceof SQLite3Stmt) {
                 $sqliteStatement->close();
             }
+            if ($savepointOpen) {
+                $this->closeReturningSavepoint($succeeded);
+            }
+        }
+    }
+
+    /**
+     * Release the savepoint opened for a RETURNING statement, after the statement is
+     * finalized. On failure the statement's changes are undone first, so no partial
+     * write survives and no transaction is left open when there was none before.
+     */
+    private function closeReturningSavepoint(bool $succeeded): void
+    {
+        if ($succeeded) {
+            try {
+                $this->connection->exec('RELEASE ' . self::RETURNING_SAVEPOINT);
+            } catch (SQLite3Exception $exception) {
+                $this->closeReturningSavepoint(false);
+                throw $this->convertErrorToException(
+                    code: $this->connection->lastExtendedErrorCode() ?: $exception->getCode(),
+                    message: $exception->getMessage(),
+                    previous: $exception,
+                );
+            }
+            return;
+        }
+        // Best effort: the original error is already propagating and must not be masked.
+        try {
+            $this->connection->exec('ROLLBACK TO ' . self::RETURNING_SAVEPOINT);
+            $this->connection->exec('RELEASE ' . self::RETURNING_SAVEPOINT);
+        } catch (Throwable) {
         }
     }
 

@@ -16,6 +16,12 @@ interface QueryBuilderInterface extends FragmentCollectionInterface, FragmentInt
     public function addColumnIfNotExists(...$arguments): static;
     public function alterColumn(...$arguments): static;
     public function alterTableIfExists(...$arguments): static;
+    /**
+     * Remove keys concealed with concealing() (and not revealed) from a result set
+     * produced by executing this query. Used by commit() and by callers that execute
+     * the prepared statement themselves, such as DBTransaction.
+     */
+    public function applyConcealment(array $result): array;
     public function asRow(): ?array;
     public function asSQL(): string;
     public function asTable(): array;

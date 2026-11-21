@@ -656,6 +656,9 @@ Behavior details:
 - Bound **input** parameters (as seen by `BEFORE_SQL_SUBMIT`) are not affected.
 - Concealment only applies to the builder that is executed. A concealing builder
   embedded as a subquery or CTE contributes only its SQL.
+- In a `DBTransaction`, each added query's own `concealing()`/`revealing()` rules
+  apply to that query's entry in the `commit()` result. Concealment runs inside the
+  transaction, so a strict-mode mismatch (see below) rolls the transaction back.
 - Concealment prevents accidental leakage; it is not an access-control boundary.
   Anyone holding the builder can call `revealing()`.
 
@@ -719,7 +722,8 @@ consistent schema, the check applies everywhere: every row and every object a pa
 reaches must contain the next segment, and every value a path descends into must
 be an object or a list (`null` and empty lists excepted). Empty results are not
 checked. The statement has already executed when this exception is thrown, so do
-not retry writes because of it. Set `DB_STRICT_CONCEAL = false` to silently ignore
+not retry writes because of it (inside a `DBTransaction` the transaction is
+rolled back instead). Set `DB_STRICT_CONCEAL = false` to silently ignore
 keys and paths that do not match.
 
 ## Data Types

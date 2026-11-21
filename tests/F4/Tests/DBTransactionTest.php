@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 namespace F4\Tests;
+use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 use PHPUnit\Framework\TestCase;
 
 use DateTimeInterface;
 use F4\DB;
 use F4\DBTransaction;
 use F4\DB\Adapter\AdapterInterface;
+use F4\DB\Adapter\SqliteAdapter;
+use F4\DB\Exception\ConcealedColumnNotFoundException;
 use F4\DB\Exception\Exception;
 use F4\DB\Exception\RollbackFailedException;
 use F4\DB\PreparedStatement;
@@ -209,5 +212,48 @@ final class DBTransactionTest extends TestCase
         $this->assertCount(3, $result, 'Result is [BEGIN, user query, COMMIT].');
         $this->assertSame(['BEGIN', 'SELECT * FROM "T1"', 'COMMIT'], $adapter->executed);
         $this->assertSame(0, $adapter->discardCount, 'A successful commit must not discard the connection.');
+    }
+
+    private static function sqliteWithUsers(): SqliteAdapter
+    {
+        $adapter = new SqliteAdapter(':memory:');
+        new DB(adapter: $adapter)->raw(['CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, password_hash TEXT)'])->commit();
+        new DB(adapter: $adapter)->insert()->into('users')->values(['id' => 1, 'name' => 'alice', 'password_hash' => 'h1'])->commit();
+        return $adapter;
+    }
+
+    #[RequiresPhpExtension('sqlite3')]
+    public function testCommitAppliesEachQueryConcealment(): void
+    {
+        $adapter = self::sqliteWithUsers();
+        $result = new DBTransaction(adapter: $adapter)
+            ->add([
+                DB::insert()->into('users')->values(['id' => 2, 'name' => 'bob', 'password_hash' => 'h2'])->returning('*')->concealing('password_hash'),
+                DB::update('users')->set(['name' => 'carol'])->where(['id' => 2])->returning('*'),
+                DB::select()->from('users')->orderBy('id')->concealing('password_hash', 'name')->revealing('name'),
+                DB::select('id', 'password_hash')->from('users')->where(['id' => 1]),
+            ])
+            ->commit();
+
+        $this->assertSame([['id' => 2, 'name' => 'bob']], $result[1]);
+        $this->assertSame([['id' => 2, 'name' => 'carol', 'password_hash' => 'h2']], $result[2], 'Rules of one query must not leak into another.');
+        $this->assertSame([['id' => 1, 'name' => 'alice'], ['id' => 2, 'name' => 'carol']], $result[3]);
+        $this->assertSame([['id' => 1, 'password_hash' => 'h1']], $result[4], 'Rules of one query must not leak into another.');
+    }
+
+    #[RequiresPhpExtension('sqlite3')]
+    public function testStrictConcealmentFailureRollsBackTransaction(): void
+    {
+        $adapter = self::sqliteWithUsers();
+        $transaction = new DBTransaction(adapter: $adapter)
+            ->add(DB::insert()->into('users')->values(['id' => 2, 'name' => 'bob', 'password_hash' => 'h2'])->returning('*')->concealing('pasword_hash'));
+
+        try {
+            $transaction->commit();
+            $this->fail('Expected ConcealedColumnNotFoundException.');
+        } catch (ConcealedColumnNotFoundException) {
+        }
+
+        $this->assertNull(new DB(adapter: $adapter)->select()->from('users')->where(['id' => 2])->asRow(), 'The insert must have been rolled back.');
     }
 }

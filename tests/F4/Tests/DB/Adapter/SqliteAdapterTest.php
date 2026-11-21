@@ -208,6 +208,85 @@ final class SqliteAdapterTest extends TestCase
         }
     }
 
+    private function counterAdapter(): SqliteAdapter
+    {
+        $adapter = $this->adapter();
+        $adapter->execute(new PreparedStatement('CREATE TABLE counters (id INTEGER PRIMARY KEY, value INTEGER NOT NULL)', []));
+        $adapter->execute(new PreparedStatement('INSERT INTO counters VALUES (1, 0), (2, 0)', []));
+        return $adapter;
+    }
+
+    private function counters(SqliteAdapter $adapter): array
+    {
+        return $adapter->execute(new PreparedStatement('SELECT id, value FROM counters ORDER BY id', []));
+    }
+
+    public function testInsertReturningInsertsOnce(): void
+    {
+        $adapter = $this->counterAdapter();
+        $this->assertSame(
+            [['id' => 3, 'value' => 7]],
+            $adapter->execute(new PreparedStatement('INSERT INTO counters (id, value) VALUES (?, ?) RETURNING id, value', [3, 7])),
+        );
+        $this->assertSame([['id' => 1, 'value' => 0], ['id' => 2, 'value' => 0], ['id' => 3, 'value' => 7]], $this->counters($adapter));
+    }
+
+    public function testUpdateReturningAppliesOnce(): void
+    {
+        $adapter = $this->counterAdapter();
+        $this->assertSame(
+            [['id' => 1, 'value' => 1], ['id' => 2, 'value' => 1]],
+            $adapter->execute(new PreparedStatement('UPDATE counters SET value = value + 1 RETURNING id, value', [])),
+        );
+        $this->assertSame([['id' => 1, 'value' => 1], ['id' => 2, 'value' => 1]], $this->counters($adapter));
+    }
+
+    public function testDeleteReturningReturnsDeletedRows(): void
+    {
+        $adapter = $this->counterAdapter();
+        $this->assertSame(
+            [['id' => 2]],
+            $adapter->execute(new PreparedStatement('DELETE FROM counters WHERE id = ? RETURNING id', [2])),
+        );
+        $this->assertSame([['id' => 1, 'value' => 0]], $this->counters($adapter));
+    }
+
+    public function testReturningWithStopAfterStillAppliesWholeStatement(): void
+    {
+        $adapter = $this->counterAdapter();
+        $this->assertSame(
+            ['id' => 1, 'value' => 1],
+            DB::update('counters')->set(['"value" = "value" + 1'])->returning('id', 'value')->useAdapter($adapter)->asRow(),
+        );
+        $this->assertSame([['id' => 1, 'value' => 1], ['id' => 2, 'value' => 1]], $this->counters($adapter));
+    }
+
+    public function testFailedReturningLeavesNoWritesAndNoOpenTransaction(): void
+    {
+        $adapter = $this->counterAdapter();
+        try {
+            $adapter->execute(new PreparedStatement('INSERT INTO counters (id, value) VALUES (3, 0), (1, 0) RETURNING id', []));
+            $this->fail('Expected DuplicateRecordException.');
+        } catch (DuplicateRecordException) {
+        }
+        $this->assertSame([['id' => 1, 'value' => 0], ['id' => 2, 'value' => 0]], $this->counters($adapter));
+        // BEGIN fails if the savepoint left a transaction open.
+        $adapter->execute(new PreparedStatement('BEGIN', []));
+        $adapter->execute(new PreparedStatement('COMMIT', []));
+    }
+
+    public function testReturningInsideTransactionDoesNotCommitEarly(): void
+    {
+        $adapter = $this->counterAdapter();
+        $adapter->execute(new PreparedStatement('BEGIN', []));
+        $this->assertSame(
+            [['value' => 1]],
+            $adapter->execute(new PreparedStatement('UPDATE counters SET value = value + 1 WHERE id = 1 RETURNING value', [])),
+        );
+        $adapter->execute(new PreparedStatement('ROLLBACK', []));
+        $this->assertSame([['id' => 1, 'value' => 0], ['id' => 2, 'value' => 0]], $this->counters($adapter));
+    }
+
     private function expectExceptionOnClosedHandle(\SQLite3 $handle): void
     {
         try {
